@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { Loader2, Lock, WifiOff, RefreshCw } from 'lucide-react';
+import { Loader2, Lock, WifiOff } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import type { ServerStatus } from '../types';
 

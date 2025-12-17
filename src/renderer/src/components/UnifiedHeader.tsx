@@ -1,5 +1,4 @@
-import { useRef } from 'react';
-import { Rocket, Settings, Download, DownloadCloud, Monitor, LayoutTemplate, MessageSquare, Split } from 'lucide-react';
+import { Rocket, Settings, DownloadCloud, LayoutTemplate, MessageSquare, Split } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useServersStore } from '../store/serversStore';
 import { ServerSelector } from './ServerSelector';

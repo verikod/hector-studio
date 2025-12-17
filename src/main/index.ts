@@ -38,7 +38,7 @@ function createWindow(): void {
   
   // Set the dock icon for macOS in development
   if (process.platform === 'darwin' && is.dev) {
-    app.dock.setIcon(icon)
+    app.dock?.setIcon(icon)
   }
 }
 

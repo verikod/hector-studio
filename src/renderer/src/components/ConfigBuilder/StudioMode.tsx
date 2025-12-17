@@ -12,12 +12,10 @@ import { useStore } from '../../store/useStore';
 import { api } from '../../services/api';
 import { configureYamlSchema } from '../../lib/monaco';
 import { EDITOR } from '../../lib/constants';
-import { getBaseUrl } from '../../lib/api-utils';
 
 export const StudioMode: React.FC = () => {
   // Global Studio State
   const viewMode = useStore((s) => s.studioViewMode);
-  const setViewMode = useStore((s) => s.setStudioViewMode);
   const designView = useStore((s) => s.studioDesignView);
   const setDesignView = useStore((s) => s.setStudioDesignView);
   const yamlContent = useStore((s) => s.studioYamlContent);

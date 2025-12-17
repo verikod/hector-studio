@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, Monitor } from 'lucide-react';
+import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -7,13 +7,11 @@ import { Input } from './ui/input';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { Badge } from './ui/badge';
 import type { ServerState } from '../types';
 
 interface ServerSelectorProps {
