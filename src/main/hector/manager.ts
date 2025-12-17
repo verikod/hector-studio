@@ -264,31 +264,8 @@ export async function startHector(port: number = 8080): Promise<void> {
   // Find free port if default is taken
   currentPort = port
   
-  // Ensure a config file exists for studio mode
+  // Config path - hector will auto-create from StudioConfigTemplate() if it doesn't exist
   const configPath = join(workspaceDir, 'agents.yaml')
-  if (!existsSync(configPath)) {
-    console.log(`[hector] Creating default config at ${configPath}`)
-    // Use ollama/qwen3 as default (free, local, no API key needed)
-    const defaultConfig = `# Hector Configuration
-# Created by Hector Studio
-
-llms:
-  default:
-    provider: ollama
-    base_url: http://localhost:11434
-    model: qwen3
-    temperature: 0.7
-
-agents:
-  assistant:
-    name: "AI Assistant"
-    llm: default
-    description: "General-purpose AI assistant"
-    instruction: "You are a helpful AI assistant."
-    streaming: true
-`
-    require('fs').writeFileSync(configPath, defaultConfig)
-  }
   
   // Start hector with config file and studio mode enabled
   hectorProcess = spawn(binaryPath, [
