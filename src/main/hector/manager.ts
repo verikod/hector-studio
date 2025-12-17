@@ -264,9 +264,30 @@ export async function startHector(port: number = 8080): Promise<void> {
   // Find free port if default is taken
   currentPort = port
   
+  // Ensure a config file exists for studio mode
+  const configPath = join(workspaceDir, 'agents.yaml')
+  if (!existsSync(configPath)) {
+    console.log(`[hector] Creating default config at ${configPath}`)
+    const defaultConfig = `# Hector Configuration
+# Created by Hector Studio
+
+version: "1"
+
+# Your agents will be defined here
+# Example:
+# agents:
+#   assistant:
+#     provider: openai
+#     model: gpt-4o
+#     description: A helpful assistant
+`
+    require('fs').writeFileSync(configPath, defaultConfig)
+  }
+  
   // Start hector with studio mode enabled
   hectorProcess = spawn(binaryPath, [
     '--port', String(port),
+    '--config', configPath,
     '--studio',
     '--cwd', workspaceDir
   ], {
