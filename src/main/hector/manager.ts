@@ -55,9 +55,14 @@ function getHectorDir(): string {
 function getHectorBinaryPath(): string {
   // Dev mode: use local hector binary if specified
   const devPath = process.env.DEV_HECTOR_PATH
-  if (devPath && existsSync(devPath)) {
-    console.log(`[hector] Using dev binary: ${devPath}`)
-    return devPath
+  console.log(`[hector] DEV_HECTOR_PATH=${devPath || '(not set)'}`)
+  if (devPath) {
+    const devExists = existsSync(devPath)
+    console.log(`[hector] Dev path exists: ${devExists}`)
+    if (devExists) {
+      console.log(`[hector] Using dev binary: ${devPath}`)
+      return devPath
+    }
   }
   
   const ext = process.platform === 'win32' ? '.exe' : ''
@@ -336,6 +341,12 @@ export async function startHector(port: number = 8080): Promise<void> {
     const localUrl = getHectorUrl()
     serverManager.registerLocalServer(localUrl)
     console.log(`[hector] Registered local server at ${localUrl}`)
+    
+    // Notify all renderer windows that servers list has changed
+    const servers = serverManager.getServers()
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.webContents.send('servers:updated', servers)
+    })
   }
 }
 
