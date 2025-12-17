@@ -40,9 +40,27 @@ For detailed configuration on authentication and security, please refer to the [
 
 Download the latest release for your operating system from the [Releases](https://github.com/verikod/hector-studio/releases) page.
 
-- **macOS**: Download the `.dmg` file and drag Hector Studio to your Applications folder.
-- **Windows**: Download and run the `.exe` installer.
-- **Linux**: AppImage, Snap, and Deb packages are available.
+### macOS
+
+1. Download the `.dmg` file and drag Hector Studio to your Applications folder.
+2. On first launch, macOS may show a security warning because the app is not signed. Run the following command to allow it:
+   ```bash
+   xattr -cr /Applications/Hector\ Studio.app
+   ```
+
+### Windows
+
+1. Download and run the `.exe` installer.
+2. If Windows SmartScreen shows "Windows protected your PC", click **More info** → **Run anyway**.
+
+### Linux
+
+1. Download the `.AppImage` or `.deb` package.
+2. For AppImage, make it executable and run:
+   ```bash
+   chmod +x hector-studio-*.AppImage
+   ./hector-studio-*.AppImage
+   ```
 
 ## License
 
