@@ -1,4 +1,5 @@
 import { registerIPCHandlers } from './ipc'
+import { createTray, registerTrayCallbacks, destroyTray } from './tray'
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -73,6 +74,30 @@ app.whenReady().then(() => {
 
   registerIPCHandlers()
 
+  // Create system tray (Docker Desktop pattern)
+  createTray()
+  
+  // Register tray callbacks
+  registerTrayCallbacks({
+    onStartHector: () => {
+      console.log('[tray] Start Hector requested - TODO: implement in Phase 3')
+    },
+    onStopHector: () => {
+      console.log('[tray] Stop Hector requested - TODO: implement in Phase 3')
+    },
+    onOpenStudio: () => {
+      createWindow()
+    },
+    onOpenPreferences: () => {
+      // TODO: Open preferences window/modal
+      console.log('[tray] Preferences requested')
+    },
+    onCheckUpdates: () => {
+      // TODO: Check for updates
+      console.log('[tray] Check updates requested')
+    }
+  })
+
   createWindow()
 
   app.on('activate', function () {
@@ -82,13 +107,20 @@ app.whenReady().then(() => {
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// When all windows are closed, keep the app running in the tray.
+// Only quit when explicitly requested via tray menu or Cmd+Q.
+// This follows the Docker Desktop pattern.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
+  // Don't quit - keep running in system tray
+  // On macOS, hide dock icon when no windows are open
+  if (process.platform === 'darwin') {
+    app.dock?.hide()
   }
+})
+
+// Clean up tray on quit
+app.on('before-quit', () => {
+  destroyTray()
 })
 
 // In this file you can include the rest of your app's specific main process
