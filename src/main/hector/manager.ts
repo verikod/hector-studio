@@ -285,11 +285,12 @@ version: "1"
   }
   
   // Start hector with studio mode enabled
+  // CLI format: hector serve --port <port> --config <path> --studio
   hectorProcess = spawn(binaryPath, [
+    'serve',
     '--port', String(port),
     '--config', configPath,
-    '--studio',
-    '--cwd', workspaceDir
+    '--studio'
   ], {
     env: {
       ...process.env,
