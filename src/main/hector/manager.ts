@@ -285,12 +285,13 @@ version: "1"
   }
   
   // Start hector with studio mode enabled
-  // CLI format: hector serve --port <port> --config <path> --studio
+  // CLI format: hector serve --port <port> --config <path> --studio --no-auth-required
   hectorProcess = spawn(binaryPath, [
     'serve',
     '--port', String(port),
     '--config', configPath,
-    '--studio'
+    '--studio',
+    '--no-auth-required'  // Local mode doesn't need auth
   ], {
     env: {
       ...process.env,
