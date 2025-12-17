@@ -16,12 +16,14 @@ import { readFile, writeFile } from 'fs/promises'
 import { get as httpsGet } from 'https'
 import { pipeline } from 'stream/promises'
 import { setTrayState } from '../tray'
+import { serverManager } from '../servers/manager'
 
 // Hector compatibility - should match Studio release
 const HECTOR_COMPATIBILITY = {
-  minVersion: '0.9.0',
-  recommendedVersion: '0.9.0',
-  downloadBaseUrl: 'https://github.com/kadirpekel/hector/releases/download'
+  minVersion: '0.9.1',
+  recommendedVersion: '0.9.1',
+  // Note: releases are under verikod/hector organization
+  downloadBaseUrl: 'https://github.com/verikod/hector/releases/download'
 }
 
 // State
@@ -86,6 +88,9 @@ export async function getInstalledVersion(): Promise<string | null> {
 
 /**
  * Get the download URL for the current platform.
+ * Releases are packaged as:
+ * - hector_{version}_{platform}_{arch}.tar.gz (macOS, Linux)
+ * - hector_{version}_{platform}_{arch}.zip (Windows)
  */
 function getDownloadUrl(version: string): string {
   const platform = process.platform === 'darwin' ? 'darwin'
@@ -93,27 +98,31 @@ function getDownloadUrl(version: string): string {
     : 'linux'
   
   const arch = process.arch === 'arm64' ? 'arm64' : 'amd64'
-  const ext = process.platform === 'win32' ? '.exe' : ''
+  const ext = process.platform === 'win32' ? 'zip' : 'tar.gz'
   
-  return `${HECTOR_COMPATIBILITY.downloadBaseUrl}/v${version}/hector-${platform}-${arch}${ext}`
+  // Format: hector_0.9.1_darwin_arm64.tar.gz
+  return `${HECTOR_COMPATIBILITY.downloadBaseUrl}/v${version}/hector_${version}_${platform}_${arch}.${ext}`
 }
 
 /**
  * Download Hector binary from GitHub releases.
+ * Downloads the archive and extracts the binary.
  */
 export async function downloadHector(
   version: string = HECTOR_COMPATIBILITY.recommendedVersion,
   onProgress?: (percent: number) => void
 ): Promise<void> {
   const url = getDownloadUrl(version)
-  const binaryPath = getHectorBinaryPath()
-  const tempPath = `${binaryPath}.downloading`
+  const hectorDir = getHectorDir()
+  const isZip = url.endsWith('.zip')
+  const archivePath = join(hectorDir, isZip ? 'hector.zip' : 'hector.tar.gz')
   
   console.log(`[hector] Downloading from ${url}`)
   
-  return new Promise((resolve, reject) => {
-    const handleRedirect = (url: string): void => {
-      httpsGet(url, (response) => {
+  // Download the archive
+  await new Promise<void>((resolve, reject) => {
+    const handleRedirect = (downloadUrl: string): void => {
+      httpsGet(downloadUrl, (response) => {
         // Handle redirects
         if (response.statusCode === 301 || response.statusCode === 302) {
           const redirectUrl = response.headers.location
@@ -124,14 +133,14 @@ export async function downloadHector(
         }
         
         if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download: HTTP ${response.statusCode}`))
+          reject(new Error(`Failed to download: HTTP ${response.statusCode} from ${downloadUrl}`))
           return
         }
         
         const totalSize = parseInt(response.headers['content-length'] || '0', 10)
         let downloadedSize = 0
         
-        const fileStream = createWriteStream(tempPath)
+        const fileStream = createWriteStream(archivePath)
         
         response.on('data', (chunk: Buffer) => {
           downloadedSize += chunk.length
@@ -141,38 +150,11 @@ export async function downloadHector(
         })
         
         pipeline(response, fileStream)
-          .then(() => {
-            // Move temp file to final location
-            try {
-              if (existsSync(binaryPath)) {
-                unlinkSync(binaryPath)
-              }
-              // Rename by copying content (more reliable cross-platform)
-              const fs = require('fs')
-              fs.renameSync(tempPath, binaryPath)
-              
-              // Make executable on Unix
-              if (process.platform !== 'win32') {
-                chmodSync(binaryPath, 0o755)
-              }
-              
-              // Save version
-              writeFile(getVersionFilePath(), version)
-                .then(() => {
-                  console.log(`[hector] Downloaded v${version} successfully`)
-                  setStatus('stopped')
-                  resolve()
-                })
-                .catch(reject)
-            } catch (err) {
-              reject(err)
-            }
-          })
+          .then(() => resolve())
           .catch((err) => {
-            // Clean up temp file on error
             try {
-              if (existsSync(tempPath)) {
-                unlinkSync(tempPath)
+              if (existsSync(archivePath)) {
+                unlinkSync(archivePath)
               }
             } catch {}
             reject(err)
@@ -182,6 +164,52 @@ export async function downloadHector(
     
     handleRedirect(url)
   })
+  
+  console.log(`[hector] Downloaded archive, extracting...`)
+  
+  // Extract the binary
+  const binaryPath = getHectorBinaryPath()
+  
+  try {
+    if (isZip) {
+      // Extract zip (Windows)
+      const AdmZip = require('adm-zip')
+      const zip = new AdmZip(archivePath)
+      zip.extractAllTo(hectorDir, true)
+    } else {
+      // Extract tar.gz (macOS, Linux)
+      const tar = require('tar')
+      await tar.extract({
+        file: archivePath,
+        cwd: hectorDir,
+      })
+    }
+    
+    // Make executable on Unix
+    if (process.platform !== 'win32' && existsSync(binaryPath)) {
+      chmodSync(binaryPath, 0o755)
+    }
+    
+    // Clean up archive
+    if (existsSync(archivePath)) {
+      unlinkSync(archivePath)
+    }
+    
+    // Save version
+    await writeFile(getVersionFilePath(), version)
+    
+    console.log(`[hector] Downloaded and extracted v${version} successfully`)
+    setStatus('stopped')
+    
+  } catch (err) {
+    // Clean up on error
+    try {
+      if (existsSync(archivePath)) {
+        unlinkSync(archivePath)
+      }
+    } catch {}
+    throw err
+  }
 }
 
 /**
@@ -290,6 +318,11 @@ export async function startHector(port: number = 8080): Promise<void> {
   // Check if it's still running
   if (hectorProcess && !hectorProcess.killed) {
     setStatus('running')
+    
+    // Register local server in the servers list
+    const localUrl = getHectorUrl()
+    serverManager.registerLocalServer(localUrl)
+    console.log(`[hector] Registered local server at ${localUrl}`)
   }
 }
 

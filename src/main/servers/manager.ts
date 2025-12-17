@@ -1,11 +1,15 @@
 import Store from 'electron-store'
 import { v4 as uuidv4 } from 'uuid'
 
+// Fixed ID for the local server - always the same so it can be found
+export const LOCAL_SERVER_ID = 'local-hector'
+
 export interface ServerConfig {
   id: string
   name: string
   url: string
   lastUsed: number
+  isLocal?: boolean  // True for the built-in local Hector server
   auth?: {
     enabled: boolean
     type: string
@@ -60,6 +64,12 @@ export class ServerManager {
 
   removeServer(id: string): void {
     const servers = this.getServers()
+    // Prevent removing the local server
+    const server = servers.find(s => s.id === id)
+    if (server?.isLocal) {
+      throw new Error('Cannot remove the local Hector server')
+    }
+    
     const newServers = servers.filter(s => s.id !== id)
     store.set('servers', newServers)
 
@@ -97,6 +107,47 @@ export class ServerManager {
     // Update last used
     this.updateServer(id, { lastUsed: Date.now() })
   }
+  
+  /**
+   * Register or update the local Hector server.
+   * Called when local Hector starts.
+   */
+  registerLocalServer(url: string): ServerConfig {
+    const servers = this.getServers()
+    const existing = servers.find(s => s.id === LOCAL_SERVER_ID)
+    
+    if (existing) {
+      // Update URL if changed
+      return this.updateServer(LOCAL_SERVER_ID, { url, lastUsed: Date.now() })
+    }
+    
+    // Create new local server entry
+    const localServer: ServerConfig = {
+      id: LOCAL_SERVER_ID,
+      name: 'Local (Built-in)',
+      url,
+      lastUsed: Date.now(),
+      isLocal: true
+    }
+    
+    // Add at the beginning so it appears first
+    store.set('servers', [localServer, ...servers])
+    
+    // Set as active if no other server is active
+    if (!store.get('activeServerId')) {
+      store.set('activeServerId', LOCAL_SERVER_ID)
+    }
+    
+    return localServer
+  }
+  
+  /**
+   * Get the local Hector server if registered.
+   */
+  getLocalServer(): ServerConfig | null {
+    return this.getServers().find(s => s.id === LOCAL_SERVER_ID) || null
+  }
 }
 
 export const serverManager = new ServerManager()
+

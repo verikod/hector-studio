@@ -271,6 +271,7 @@ export interface ServerConfig {
   name: string;
   url: string;
   lastUsed: number;
+  isLocal?: boolean;  // True for the built-in local Hector server
   auth?: {
     enabled: boolean;
     type: string;
