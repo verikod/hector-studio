@@ -50,8 +50,16 @@ function getHectorDir(): string {
 
 /**
  * Get the Hector binary path.
+ * In development, can be overridden with DEV_HECTOR_PATH environment variable.
  */
 function getHectorBinaryPath(): string {
+  // Dev mode: use local hector binary if specified
+  const devPath = process.env.DEV_HECTOR_PATH
+  if (devPath && existsSync(devPath)) {
+    console.log(`[hector] Using dev binary: ${devPath}`)
+    return devPath
+  }
+  
   const ext = process.platform === 'win32' ? '.exe' : ''
   return join(getHectorDir(), `hector${ext}`)
 }
