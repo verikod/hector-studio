@@ -19,7 +19,7 @@ For comprehensive documentation, please visit the [Hector Studio Documentation](
 
 1. **Install Hector**:
     ```bash
-    go install github.com/verikod/hector@latest
+    go install github.com/verikod/hector/cmd/hector@latest
     ```
 
 2. **Start Hector in Studio Mode**:
