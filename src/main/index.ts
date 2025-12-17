@@ -1,6 +1,14 @@
 import { registerIPCHandlers } from './ipc'
 import { createTray, registerTrayCallbacks, destroyTray } from './tray'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import {
+  isHectorInstalled,
+  startHector,
+  stopHector,
+  downloadHector,
+  checkForUpdates,
+  getHectorStatus
+} from './hector/manager'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -77,13 +85,39 @@ app.whenReady().then(() => {
   // Create system tray (Docker Desktop pattern)
   createTray()
   
-  // Register tray callbacks
+  // Register tray callbacks with Hector manager
   registerTrayCallbacks({
-    onStartHector: () => {
-      console.log('[tray] Start Hector requested - TODO: implement in Phase 3')
+    onStartHector: async () => {
+      try {
+        if (!isHectorInstalled()) {
+          const result = await dialog.showMessageBox({
+            type: 'question',
+            buttons: ['Download', 'Cancel'],
+            defaultId: 0,
+            title: 'Hector Not Installed',
+            message: 'Hector is not installed. Would you like to download it?'
+          })
+          
+          if (result.response === 0) {
+            console.log('[main] Downloading Hector...')
+            await downloadHector()
+            console.log('[main] Download complete, starting Hector...')
+            await startHector()
+          }
+        } else {
+          await startHector()
+        }
+      } catch (err) {
+        console.error('[main] Failed to start Hector:', err)
+        dialog.showErrorBox('Failed to Start Hector', String(err))
+      }
     },
-    onStopHector: () => {
-      console.log('[tray] Stop Hector requested - TODO: implement in Phase 3')
+    onStopHector: async () => {
+      try {
+        await stopHector()
+      } catch (err) {
+        console.error('[main] Failed to stop Hector:', err)
+      }
     },
     onOpenStudio: () => {
       createWindow()
@@ -92,9 +126,37 @@ app.whenReady().then(() => {
       // TODO: Open preferences window/modal
       console.log('[tray] Preferences requested')
     },
-    onCheckUpdates: () => {
-      // TODO: Check for updates
-      console.log('[tray] Check updates requested')
+    onCheckUpdates: async () => {
+      try {
+        const { hasUpdate, currentVersion, latestVersion } = await checkForUpdates()
+        if (hasUpdate) {
+          const result = await dialog.showMessageBox({
+            type: 'info',
+            buttons: ['Update', 'Later'],
+            defaultId: 0,
+            title: 'Update Available',
+            message: `Hector ${latestVersion} is available (you have ${currentVersion || 'none'}).`
+          })
+          
+          if (result.response === 0) {
+            await downloadHector(latestVersion)
+            dialog.showMessageBox({
+              type: 'info',
+              title: 'Update Complete',
+              message: `Hector has been updated to v${latestVersion}.`
+            })
+          }
+        } else {
+          dialog.showMessageBox({
+            type: 'info',
+            title: 'No Updates',
+            message: `You have the latest version${currentVersion ? ` (v${currentVersion})` : ''}.`
+          })
+        }
+      } catch (err) {
+        console.error('[main] Failed to check updates:', err)
+        dialog.showErrorBox('Update Check Failed', String(err))
+      }
     }
   })
 
@@ -118,8 +180,13 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Clean up tray on quit
-app.on('before-quit', () => {
+// Clean up on quit
+app.on('before-quit', async () => {
+  // Stop Hector if running
+  if (getHectorStatus() === 'running') {
+    console.log('[main] Stopping Hector before quit...')
+    await stopHector()
+  }
   destroyTray()
 })
 

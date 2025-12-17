@@ -1,6 +1,18 @@
 import { ipcMain } from 'electron'
 import { serverManager } from './servers/manager'
 import { authManager } from './auth/manager'
+import {
+  isHectorInstalled,
+  getInstalledVersion,
+  downloadHector,
+  startHector,
+  stopHector,
+  getHectorStatus,
+  getHectorUrl,
+  getWorkspaceDir,
+  setWorkspaceDir,
+  checkForUpdates
+} from './hector/manager'
 
 export function registerIPCHandlers(): void {
   // Server Management
@@ -43,5 +55,36 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('auth:is-authenticated', async (_, url) => {
     return authManager.isAuthenticated(url)
+  })
+
+  // Local Hector Management
+  ipcMain.handle('hector:is-installed', () => isHectorInstalled())
+  
+  ipcMain.handle('hector:get-version', () => getInstalledVersion())
+  
+  ipcMain.handle('hector:download', async (_, version?: string) => {
+    return downloadHector(version)
+  })
+  
+  ipcMain.handle('hector:start', async (_, port?: number) => {
+    return startHector(port)
+  })
+  
+  ipcMain.handle('hector:stop', async () => {
+    return stopHector()
+  })
+  
+  ipcMain.handle('hector:get-status', () => getHectorStatus())
+  
+  ipcMain.handle('hector:get-url', () => getHectorUrl())
+  
+  ipcMain.handle('hector:get-workspace', () => getWorkspaceDir())
+  
+  ipcMain.handle('hector:set-workspace', async (_, dir: string) => {
+    return setWorkspaceDir(dir)
+  })
+  
+  ipcMain.handle('hector:check-updates', async () => {
+    return checkForUpdates()
   })
 }
