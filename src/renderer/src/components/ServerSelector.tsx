@@ -106,8 +106,8 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
             case 'authenticated': return 'bg-green-500';
             case 'auth_required': return 'bg-yellow-500';
             case 'disconnected': return 'bg-red-500';
-            case 'unreachable': return 'bg-gray-500';
-            default: return 'bg-blue-500';
+            case 'unreachable': return 'bg-red-500';
+            default: return 'bg-blue-500'; // 'added' state - connecting
         }
     };
 
@@ -123,7 +123,11 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
                     </div>
                     <div className="flex items-center gap-2">
                         {activeServer && (
-                            <div className={cn("w-2 h-2 rounded-full", getStatusColor(activeServer.status))} />
+                            <div className={cn(
+                                "w-2 h-2 rounded-full",
+                                getStatusColor(activeServer.status),
+                                (activeServer.status === 'disconnected' || activeServer.status === 'unreachable') && 'animate-pulse'
+                            )} />
                         )}
                         <ChevronDown size={14} className="opacity-50" />
                     </div>
@@ -146,7 +150,11 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
                                 )}
                             >
                                 <div className="flex items-center gap-2 overflow-hidden">
-                                    <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getStatusColor(server.status))} />
+                                    <div className={cn(
+                                        "w-2 h-2 rounded-full flex-shrink-0",
+                                        getStatusColor(server.status),
+                                        (server.status === 'disconnected' || server.status === 'unreachable') && 'animate-pulse'
+                                    )} />
                                     <div className="flex flex-col min-w-0">
                                         <span className="font-medium truncate text-xs">{server.config.name}</span>
                                         <span className="text-[10px] text-gray-500 truncate">{server.config.url}</span>

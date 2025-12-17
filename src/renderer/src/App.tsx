@@ -6,6 +6,7 @@ import { SuccessDisplay } from "./components/SuccessDisplay";
 import { useStore } from "./store/useStore";
 import { useServersStore } from "./store/serversStore";
 import { useServersInit } from "./lib/hooks/useServersInit";
+import { useHealthPolling } from "./lib/hooks/useHealthPolling";
 import { UnifiedHeader } from "./components/UnifiedHeader";
 import { CoverOverlay } from "./components/CoverOverlay";
 import { LoginModal } from "./components/LoginModal";
@@ -13,6 +14,9 @@ import { LoginModal } from "./components/LoginModal";
 function App() {
   // Initialize servers from main process
   useServersInit();
+
+  // Poll active server health every 10s
+  useHealthPolling();
 
   const loadAgents = useStore((state) => state.loadAgents);
   const createSession = useStore((state) => state.createSession);
