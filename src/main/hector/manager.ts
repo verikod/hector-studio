@@ -284,15 +284,16 @@ version: "1"
     require('fs').writeFileSync(configPath, defaultConfig)
   }
   
-  // Start hector with studio mode enabled
-  // CLI format: hector serve --port <port> --config <path> --studio --no-auth-required
+  // Start hector in zero-config mode (no config file needed)
+  // This avoids auth configuration issues and provides a simple local experience
+  // Users can configure a full agents.yaml later if needed
   hectorProcess = spawn(binaryPath, [
     'serve',
     '--port', String(port),
-    '--config', configPath,
-    '--studio',
+    '--model', 'gpt-4o',  // Default model, will use OPENAI_API_KEY from env
     '--no-auth-required'  // Local mode doesn't need auth
   ], {
+    cwd: workspaceDir,  // Set working directory for file tools
     env: {
       ...process.env,
       // Add any additional env vars here
