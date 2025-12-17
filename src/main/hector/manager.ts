@@ -284,14 +284,14 @@ version: "1"
     require('fs').writeFileSync(configPath, defaultConfig)
   }
   
-  // Start hector in zero-config mode (no config file needed)
-  // This avoids auth configuration issues and provides a simple local experience
-  // Users can configure a full agents.yaml later if needed
+  // Start hector in zero-config mode with studio enabled
+  // Defaults to ollama/qwen3 (free, local) - users can configure other providers later
   hectorProcess = spawn(binaryPath, [
     'serve',
     '--port', String(port),
-    '--model', 'gpt-4o',  // Default model, will use OPENAI_API_KEY from env
-    '--no-auth-required'  // Local mode doesn't need auth
+    '--provider', 'ollama',
+    '--model', 'qwen3',
+    '--studio'  // Enable Studio UI for config editing
   ], {
     cwd: workspaceDir,  // Set working directory for file tools
     env: {
