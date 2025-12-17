@@ -16,7 +16,22 @@ import { readFile, writeFile } from 'fs/promises'
 import { get as httpsGet } from 'https'
 import { pipeline } from 'stream/promises'
 import { setTrayState } from '../tray'
-import { serverManager } from '../servers/manager'
+import { serverManager, LOCAL_SERVER_ID } from '../servers/manager'
+
+/**
+ * Emit status change event for local server to all renderer windows.
+ * Provides instant UI feedback instead of waiting for polling.
+ */
+function emitLocalServerStatus(status: 'starting' | 'running' | 'stopping' | 'stopped' | 'error', error?: string): void {
+  const statusEvent = {
+    id: LOCAL_SERVER_ID,
+    status: status === 'running' ? 'authenticated' : status === 'error' ? 'error' : 'checking',
+    error
+  }
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.webContents.send('server:status-change', statusEvent)
+  })
+}
 
 // Hector compatibility - should match Studio release
 const HECTOR_COMPATIBILITY = {
@@ -273,6 +288,7 @@ export async function startHector(port: number = 8080): Promise<void> {
   
   console.log(`[hector] Starting on port ${port} with workspace ${workspaceDir}`)
   setStatus('starting')
+  emitLocalServerStatus('starting')  // Instant UI feedback
   
   // Find free port if default is taken
   currentPort = port
@@ -328,6 +344,7 @@ export async function startHector(port: number = 8080): Promise<void> {
     console.error('[hector] Failed to start:', err)
     hectorProcess = null
     setStatus('error', err.message)
+    emitLocalServerStatus('error', err.message)  // Instant UI feedback
   })
   
   // Give it a moment to start
@@ -336,6 +353,7 @@ export async function startHector(port: number = 8080): Promise<void> {
   // Check if it's still running
   if (hectorProcess && !hectorProcess.killed) {
     setStatus('running')
+    emitLocalServerStatus('running')  // Instant UI feedback
     
     // Register local server in the servers list
     const localUrl = getHectorUrl()
@@ -360,6 +378,7 @@ export async function stopHector(): Promise<void> {
   }
   
   console.log('[hector] Stopping...')
+  emitLocalServerStatus('stopping')  // Instant UI feedback
   
   return new Promise((resolve) => {
     const proc = hectorProcess!
@@ -368,6 +387,7 @@ export async function stopHector(): Promise<void> {
     proc.once('close', () => {
       hectorProcess = null
       setStatus('stopped')
+      emitLocalServerStatus('stopped')  // Instant UI feedback
       resolve()
     })
     
