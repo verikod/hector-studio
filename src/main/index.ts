@@ -81,7 +81,8 @@ async function initializeApp(): Promise<void> {
   // Notify renderer that app is ready with status info
   const readyPayload = {
     hectorInstalled: isHectorInstalled(),
-    hasWorkspaces: serverManager.getServers().length > 0
+    hasWorkspaces: serverManager.getServers().filter(s => s.isLocal).length > 0,
+    workspacesEnabled: serverManager.getWorkspacesEnabled()
   }
   console.log('[main] App ready:', readyPayload)
   BrowserWindow.getAllWindows().forEach(win => {

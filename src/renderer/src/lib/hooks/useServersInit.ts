@@ -16,7 +16,7 @@ export function useServersInit() {
       try {
         const servers = await (window as any).api.server.list() as ServerConfig[];
         syncFromMain(servers);
-        
+
         // Check auth status for each server
         for (const server of servers) {
           const authConfig = await (window as any).api.server.discoverAuth(server.url);
@@ -39,33 +39,33 @@ export function useServersInit() {
       syncFromMain(servers);
     });
 
-    const unsubStatus = (window as any).api.server.onServerStatusChange(async (data: { 
-      id: string; 
-      status: ServerStatus; 
+    const unsubStatus = (window as any).api.server.onServerStatusChange(async (data: {
+      id: string;
+      status: ServerStatus;
       error?: string;
     }) => {
-      setServerStatus(data.id, data.status, data.error);
-      
-      // If a local workspace started, switch to it (handles Tray-initiated switches)
-      if (data.status === 'authenticated') {
-        const store = useServersStore.getState();
-        let server = store.servers[data.id];
-        
-        // If not in store yet (race condition), try to fetch/sync
-        if (!server) {
-             const list = await (window as any).api.server.list();
-             store.syncFromMain(list);
-             server = useServersStore.getState().servers[data.id];
-        }
+      const store = useServersStore.getState();
+      let server = store.servers[data.id];
 
-        if (server?.config.isLocal) {
-            store.selectServer(data.id);
-        }
+      // If not in store yet (race condition), fetch and sync first
+      if (!server) {
+        console.log('[useServersInit] Server not in store, syncing...', data.id);
+        const list = await (window as any).api.server.list();
+        store.syncFromMain(list);
+        server = useServersStore.getState().servers[data.id];
+      }
+
+      // Now set the status
+      setServerStatus(data.id, data.status, data.error);
+
+      // If a local workspace started, switch to it
+      if (data.status === 'authenticated' && server?.config.isLocal) {
+        store.selectServer(data.id);
       }
     });
 
-    const unsubAuth = (window as any).api.auth.onAuthStatusChange((data: { 
-      url: string; 
+    const unsubAuth = (window as any).api.auth.onAuthStatusChange((data: {
+      url: string;
       authenticated: boolean;
     }) => {
       // Find server by URL and update status

@@ -36,6 +36,13 @@ const api = {
     createDefault: () => ipcRenderer.invoke('workspace:create-default')
   },
   
+  // Workspaces Feature Toggle
+  workspaces: {
+    isEnabled: () => ipcRenderer.invoke('workspaces:is-enabled'),
+    enable: () => ipcRenderer.invoke('workspaces:enable'),
+    disable: () => ipcRenderer.invoke('workspaces:disable')
+  },
+  
   // Auth Management
   auth: {
     login: (url: string) => ipcRenderer.invoke('auth:login', url),

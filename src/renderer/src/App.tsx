@@ -12,6 +12,7 @@ import { CoverOverlay } from "./components/CoverOverlay";
 import { LoginModal } from "./components/LoginModal";
 import { InitializationCover } from "./components/InitializationCover";
 import { WelcomeCover } from "./components/WelcomeCover";
+import { EnableWorkspacesModal } from "./components/EnableWorkspacesModal";
 
 // App lifecycle states
 type AppState = 'initializing' | 'needs_download' | 'downloading' | 'ready';
@@ -19,27 +20,47 @@ type AppState = 'initializing' | 'needs_download' | 'downloading' | 'ready';
 function App() {
   // App lifecycle state machine
   const [appState, setAppState] = useState<AppState>('initializing');
+  // Whether workspaces feature is enabled (user opted in)
+  const [workspacesEnabled, setWorkspacesEnabled] = useState(false);
 
   // Listen for app:ready event from main process
   useEffect(() => {
     const unsubscribe = window.api.app.onReady((payload) => {
       console.log('[App] Received app:ready:', payload);
-      if (!payload.hectorInstalled) {
+      setWorkspacesEnabled(payload.workspacesEnabled);
+
+      // Determine initial app state
+      if (payload.workspacesEnabled && !payload.hectorInstalled) {
+        // Workspaces enabled but hector missing - shouldn't happen normally
         setAppState('needs_download');
       } else {
+        // Either workspaces disabled (remote-only) or all good
         setAppState('ready');
       }
     });
     return unsubscribe;
   }, []);
 
-  // Handle hector download
+  // State for enable workspaces modal
+  const [showEnableWorkspacesModal, setShowEnableWorkspacesModal] = useState(false);
+
+  // Handle enabling workspaces - opens the wizard modal
+  const handleEnableWorkspaces = () => {
+    setShowEnableWorkspacesModal(true);
+  };
+
+  // Called when wizard completes successfully
+  const handleEnableWorkspacesComplete = () => {
+    setWorkspacesEnabled(true);
+    setShowEnableWorkspacesModal(false);
+  };
+
+  // Handle hector download from WelcomeCover (shows splash progress)
   const handleDownloadHector = async () => {
     setAppState('downloading');
     try {
-      await window.api.hector.download();
-      // After download, create and start default workspace
-      await window.api.workspace.createDefault();
+      await window.api.workspaces.enable();
+      setWorkspacesEnabled(true);
       setAppState('ready');
     } catch (error) {
       console.error('Download failed:', error);
@@ -76,6 +97,8 @@ function App() {
 
   // Prevent double initialization on mount
   const initializedRef = useRef(false);
+  // Track active server ID to only reset session on actual switch
+  const activeServerIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -92,6 +115,13 @@ function App() {
   useEffect(() => {
     if (activeServer?.status === 'authenticated') {
       setEndpointUrl(activeServer.config.url);
+
+      // Start a fresh chat session for the new server (only if ID changed)
+      if (activeServerIdRef.current !== activeServer.config.id) {
+        createSession();
+        activeServerIdRef.current = activeServer.config.id;
+      }
+
       // Reset agent state completely before reloading for new server
       useStore.getState().setAvailableAgents([]);
       useStore.setState({ agentsLoaded: false }); // Reset idempotency guard
@@ -183,6 +213,8 @@ function App() {
         onLoginRequest={handleLoginRequest}
         onLogoutRequest={handleLogoutRequest}
         onOpenSettings={() => setShowSettings(true)}
+        workspacesEnabled={workspacesEnabled}
+        onEnableWorkspaces={handleEnableWorkspaces}
       />
 
       {/* Main Content - flex-1 with min-h-0 to allow shrinking */}
@@ -227,6 +259,11 @@ function App() {
         onClose={() => setShowSettings(false)}
         editorTheme={editorTheme}
         onThemeChange={setEditorTheme}
+      />
+      <EnableWorkspacesModal
+        isOpen={showEnableWorkspacesModal}
+        onClose={() => setShowEnableWorkspacesModal(false)}
+        onComplete={handleEnableWorkspacesComplete}
       />
       <ErrorDisplay />
       <SuccessDisplay />

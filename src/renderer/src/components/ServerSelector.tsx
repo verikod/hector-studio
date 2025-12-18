@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
+import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -17,9 +18,11 @@ import type { ServerState } from '../types';
 interface ServerSelectorProps {
     onLoginRequest: (serverId: string) => void;
     onLogoutRequest: (serverId: string) => void;
+    workspacesEnabled: boolean;
+    onEnableWorkspaces: () => void;
 }
 
-export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelectorProps) {
+export function ServerSelector({ onLoginRequest, onLogoutRequest, workspacesEnabled, onEnableWorkspaces }: ServerSelectorProps) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [newName, setNewName] = useState('');
     const [newUrl, setNewUrl] = useState('');
@@ -31,7 +34,10 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
     const removeServer = useServersStore((s) => s.removeServer);
 
     const activeServer = activeServerId ? servers[activeServerId] : null;
-    const serverList = Object.values(servers);
+    // Filter out local workspaces when workspaces feature is disabled
+    const serverList = Object.values(servers).filter(s =>
+        workspacesEnabled || !s.config.isLocal
+    );
 
     const handleAddServer = async (e: React.MouseEvent) => {
         e.preventDefault();
@@ -70,6 +76,22 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
     const handleAddWorkspace = async () => {
         setIsOpen(false);
         try {
+            // First check if hector is installed
+            const isInstalled = await (window as any).api.hector.isInstalled();
+
+            if (!isInstalled) {
+                // Prompt user to download hector
+                const shouldDownload = confirm(
+                    'Hector needs to be installed to use local workspaces.\n\nWould you like to download it now?'
+                );
+
+                if (!shouldDownload) return;
+
+                // Download hector
+                await (window as any).api.hector.download();
+            }
+
+            // Now browse for folder
             const path = await (window as any).api.workspace.browse();
             if (!path) return; // User cancelled
 
@@ -77,16 +99,17 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
             const workspace = await (window as any).api.workspace.add(name, path);
 
             if (workspace) {
-                const { addServer, setServerStatus } = useServersStore.getState();
+                const { addServer } = useServersStore.getState();
                 addServer(workspace);
 
-                // Switch to new workspace
-                await (window as any).api.workspace.switch(workspace.id);
+                // Start the new workspace
+                await (window as any).api.workspace.start(workspace.id);
                 selectServer(workspace.id);
-                setServerStatus(workspace.id, 'checking');
+                // Status is handled by backend events (start emits 'running' -> 'authenticated')
             }
         } catch (error) {
             console.error('Failed to add workspace:', error);
+            useStore.getState().setError(`Failed to add workspace: ${error}`);
         }
     };
 
@@ -97,7 +120,7 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
         const localWorkspaces = serverList.filter(s => s.config.isLocal);
         const isLocal = servers[id]?.config.isLocal;
         if (isLocal && localWorkspaces.length <= 1) {
-            alert('Cannot delete the last workspace. At least one workspace is required.');
+            alert('Cannot delete the default workspace.\n\nTo remove all workspaces, go to Settings and disable the Workspaces feature.');
             return;
         }
 
@@ -256,10 +279,17 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
                     </div>
                 ) : (
                     <>
-                        <DropdownMenuItem onSelect={() => handleAddWorkspace()} className="cursor-pointer focus:bg-gray-800 focus:text-white">
-                            <FolderOpen size={14} className="mr-2" />
-                            Add Workspace
-                        </DropdownMenuItem>
+                        {workspacesEnabled ? (
+                            <DropdownMenuItem onSelect={() => handleAddWorkspace()} className="cursor-pointer focus:bg-gray-800 focus:text-white">
+                                <FolderOpen size={14} className="mr-2" />
+                                Add Workspace
+                            </DropdownMenuItem>
+                        ) : (
+                            <DropdownMenuItem onSelect={() => onEnableWorkspaces()} className="cursor-pointer focus:bg-gray-800 focus:text-white">
+                                <FolderOpen size={14} className="mr-2" />
+                                Enable Local Workspaces
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowAddForm(true); }} className="cursor-pointer focus:bg-gray-800 focus:text-white">
                             <Plus size={14} className="mr-2" />
                             Add Remote Server

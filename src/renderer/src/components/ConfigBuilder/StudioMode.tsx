@@ -183,9 +183,15 @@ export const StudioMode: React.FC = () => {
     }
   };
 
-  // Load initial config
+  // Load initial config (only if studio mode is enabled)
   const endpointUrl = useStore((state) => state.endpointUrl);
   useEffect(() => {
+    // Skip config fetch if studio mode is disabled (chat-only server)
+    if (!isStudioModeEnabled) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const loadConfig = async () => {
       try {
@@ -196,13 +202,13 @@ export const StudioMode: React.FC = () => {
         validateYaml(text);
       } catch (error) {
         console.error('Failed to load config:', error);
-        useStore.getState().setError((error as Error).message);
+        // Don't show error toast for studio config - it's expected for non-studio servers
       } finally {
         setLoading(false);
       }
     };
     loadConfig();
-  }, [endpointUrl, setYamlContent, validateYaml]);
+  }, [endpointUrl, isStudioModeEnabled, setYamlContent, validateYaml]);
 
   // Fetch schema logic
   useEffect(() => {

@@ -17,9 +17,11 @@ interface UnifiedHeaderProps {
     onLoginRequest: (serverId: string) => void;
     onLogoutRequest: (serverId: string) => void;
     onOpenSettings: () => void;
+    workspacesEnabled: boolean;
+    onEnableWorkspaces: () => void;
 }
 
-export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings }: UnifiedHeaderProps) {
+export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings, workspacesEnabled, onEnableWorkspaces }: UnifiedHeaderProps) {
     const activeServer = useServersStore((s) => s.getActiveServer());
 
     // Studio State
@@ -104,6 +106,8 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings 
                 <ServerSelector
                     onLoginRequest={onLoginRequest}
                     onLogoutRequest={onLogoutRequest}
+                    workspacesEnabled={workspacesEnabled}
+                    onEnableWorkspaces={onEnableWorkspaces}
                 />
             </div>
 

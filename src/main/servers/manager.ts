@@ -24,13 +24,15 @@ export interface ServerConfig {
 interface ServerStore {
   servers: ServerConfig[]
   activeServerId: string | null
+  workspacesEnabled: boolean  // Whether local workspaces feature is enabled
 }
 
 const store = new Store<ServerStore>({
   name: 'servers',
   defaults: {
     servers: [],
-    activeServerId: null
+    activeServerId: null,
+    workspacesEnabled: false  // Default to false, user must opt-in
   }
 })
 
@@ -214,6 +216,20 @@ export class ServerManager {
   getActiveWorkspace(): ServerConfig | null {
     const active = this.getActiveServer()
     return active?.isLocal ? active : null
+  }
+  
+  /**
+   * Check if workspaces feature is enabled.
+   */
+  getWorkspacesEnabled(): boolean {
+    return store.get('workspacesEnabled')
+  }
+  
+  /**
+   * Enable or disable workspaces feature.
+   */
+  setWorkspacesEnabled(enabled: boolean): void {
+    store.set('workspacesEnabled', enabled)
   }
 }
 

@@ -94,6 +94,51 @@ export function registerIPCHandlers(): void {
     
     return workspace
   })
+  
+  // Workspaces feature toggle
+  ipcMain.handle('workspaces:is-enabled', () => {
+    return serverManager.getWorkspacesEnabled()
+  })
+  
+  ipcMain.handle('workspaces:enable', async () => {
+    console.log('[ipc] Enabling workspaces...')
+    
+    // Download hector if not installed
+    if (!isHectorInstalled()) {
+      console.log('[ipc] Downloading hector...')
+      await downloadHector()
+    }
+    
+    // Create default workspace if no workspaces exist
+    const servers = serverManager.getServers()
+    const localWorkspaces = servers.filter(s => s.isLocal)
+    
+    if (localWorkspaces.length === 0) {
+      const documentsPath = app.getPath('documents')
+      const defaultPath = join(documentsPath, 'Hector', 'Default')
+      mkdirSync(defaultPath, { recursive: true })
+      
+      console.log('[ipc] Creating default workspace:', defaultPath)
+      const workspace = serverManager.addWorkspace('Default', defaultPath)
+      
+      if (workspace) {
+        console.log('[ipc] Starting default workspace:', workspace.id)
+        await startWorkspace(workspace)
+      }
+    }
+    
+    // Enable workspaces feature
+    serverManager.setWorkspacesEnabled(true)
+    console.log('[ipc] Workspaces enabled')
+    
+    return { success: true }
+  })
+  
+  ipcMain.handle('workspaces:disable', () => {
+    console.log('[ipc] Disabling workspaces')
+    serverManager.setWorkspacesEnabled(false)
+    return { success: true }
+  })
 
   // Auth Management
   ipcMain.handle('auth:login', async (_, url) => {

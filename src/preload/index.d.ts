@@ -45,6 +45,11 @@ declare global {
       getActive: () => Promise<string | null>
       createDefault: () => Promise<ServerConfig>
     }
+    workspaces: {
+      isEnabled: () => Promise<boolean>
+      enable: () => Promise<{ success: boolean }>
+      disable: () => Promise<{ success: boolean }>
+    }
     auth: {
       login: (url: string) => Promise<void>
       logout: (url: string) => Promise<void>
@@ -60,7 +65,7 @@ declare global {
       checkUpdates: () => Promise<{ hasUpdate: boolean, currentVersion: string | null, latestVersion: string }>
     }
     app: {
-      onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean }) => void) => () => void
+      onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean }) => void) => () => void
     }
   }
 }
