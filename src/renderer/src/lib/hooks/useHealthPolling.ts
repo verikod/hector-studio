@@ -22,7 +22,9 @@ export function useHealthPolling() {
         if (!activeServer || isPollingRef.current) return;
         
         // Only poll if currently authenticated or disconnected (recovery)
-        if (activeServer.status !== 'authenticated' && activeServer.status !== 'disconnected') {
+        // Skip during transient states: 'checking', 'stopping', 'stopped', 'added'
+        const pollableStates = ['authenticated', 'disconnected'];
+        if (!pollableStates.includes(activeServer.status)) {
             return;
         }
         
@@ -50,13 +52,13 @@ export function useHealthPolling() {
                 throw new Error(`Health check returned ${res.status}`);
             }
         } catch (error) {
-            // Connection lost
-            // Check current status from store to ensure we haven't switched/stopped in the meantime
+            // Re-check current state from store - workspace may have switched during fetch
             const currentServer = useServersStore.getState().getActiveServer();
-            const stillActive = currentServer?.config.id === activeServer.config.id;
+            const stillSameServer = currentServer?.config.id === activeServer.config.id;
             const stillAuthenticated = currentServer?.status === 'authenticated';
 
-            if (stillActive && stillAuthenticated) {
+            // Only report error if same server is still active and was authenticated
+            if (stillSameServer && stillAuthenticated) {
                 console.log('[health] Connection lost to', activeServer.config.name, error);
                 setServerStatus(
                     activeServer.config.id,
@@ -67,6 +69,7 @@ export function useHealthPolling() {
                     `Connection lost to ${activeServer.config.name}`
                 );
             }
+            // Otherwise silently ignore - workspace was switched or stopped
         } finally {
             isPollingRef.current = false;
         }

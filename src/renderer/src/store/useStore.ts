@@ -268,6 +268,9 @@ export const useStore = create<AppState>()(
           return;
         }
 
+        // Capture current endpoint to detect workspace switch during fetch
+        const currentEndpoint = state.endpointUrl;
+
         try {
           const response = await api.fetchAgents();
           let agents: Agent[] = [];
@@ -299,7 +302,10 @@ export const useStore = create<AppState>()(
           }
         } catch (e) {
           logger.error("Failed to load agents", e);
-          set({ error: "Failed to load agents. Please check connection." });
+          // Only show error toast if endpoint hasn't changed (i.e., we haven't switched workspace)
+          if (get().endpointUrl === currentEndpoint) {
+            set({ error: "Failed to load agents. Please check connection." });
+          }
         }
       },
       reloadAgents: async () => {
