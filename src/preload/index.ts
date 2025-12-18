@@ -11,7 +11,7 @@ const api = {
     getActive: () => ipcRenderer.invoke('server:get-active'),
     setActive: (id: string) => ipcRenderer.invoke('server:set-active', id),
     discoverAuth: (url: string) => ipcRenderer.invoke('server:discover-auth', url),
-    
+
     // Event subscriptions
     onServersUpdated: (callback: (servers: any[]) => void) => {
       const handler = (_: any, servers: any[]) => callback(servers)
@@ -24,7 +24,7 @@ const api = {
       return () => ipcRenderer.removeListener('server:status-change', handler)
     }
   },
-  
+
   // Workspace Management (local servers)
   workspace: {
     browse: () => ipcRenderer.invoke('workspace:browse'),
@@ -35,43 +35,52 @@ const api = {
     getActive: () => ipcRenderer.invoke('workspace:get-active'),
     createDefault: () => ipcRenderer.invoke('workspace:create-default')
   },
-  
+
   // Workspaces Feature Toggle
   workspaces: {
     isEnabled: () => ipcRenderer.invoke('workspaces:is-enabled'),
     enable: () => ipcRenderer.invoke('workspaces:enable'),
     disable: () => ipcRenderer.invoke('workspaces:disable')
   },
-  
+
   // Auth Management
   auth: {
     login: (url: string) => ipcRenderer.invoke('auth:login', url),
     logout: (url: string) => ipcRenderer.invoke('auth:logout', url),
     getToken: (url: string) => ipcRenderer.invoke('auth:get-token', url),
     isAuthenticated: (url: string) => ipcRenderer.invoke('auth:is-authenticated', url),
-    
+
     onAuthStatusChange: (callback: (data: { url: string, authenticated: boolean }) => void) => {
       const handler = (_: any, data: any) => callback(data)
       ipcRenderer.on('auth:status-change', handler)
       return () => ipcRenderer.removeListener('auth:status-change', handler)
     }
   },
-  
+
   // Hector binary management
   hector: {
     isInstalled: () => ipcRenderer.invoke('hector:is-installed'),
     getVersion: () => ipcRenderer.invoke('hector:get-version'),
     download: (version?: string) => ipcRenderer.invoke('hector:download', version),
     getStatus: () => ipcRenderer.invoke('hector:get-status'),
-    checkUpdates: () => ipcRenderer.invoke('hector:check-updates')
+    checkUpdates: () => ipcRenderer.invoke('hector:check-updates'),
+    upgrade: () => ipcRenderer.invoke('hector:upgrade')
   },
-  
+
   // App lifecycle
   app: {
-    onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean }) => void) => {
-      const handler = (_event: any, payload: { hectorInstalled: boolean, hasWorkspaces: boolean }) => callback(payload)
+    onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => void) => {
+      const handler = (_event: any, payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => callback(payload)
       ipcRenderer.on('app:ready', handler)
       return () => ipcRenderer.removeListener('app:ready', handler)
+    },
+    checkUpdate: () => ipcRenderer.invoke('app:check-update'),
+    startDownload: () => ipcRenderer.invoke('app:start-download'),
+    installUpdate: () => ipcRenderer.invoke('app:install-update'),
+    onUpdateStatus: (callback: (data: { status: string, data?: any }) => void) => {
+      const handler = (_: any, data: any) => callback(data)
+      ipcRenderer.on('app:update-status', handler)
+      return () => ipcRenderer.removeListener('app:update-status', handler)
     }
   }
 }

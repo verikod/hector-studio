@@ -63,9 +63,14 @@ declare global {
       download: (version?: string) => Promise<void>
       getStatus: () => Promise<string>
       checkUpdates: () => Promise<{ hasUpdate: boolean, currentVersion: string | null, latestVersion: string }>
+      upgrade: () => Promise<void>
     }
     app: {
-      onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean }) => void) => () => void
+      onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => void) => () => void
+      checkUpdate: () => Promise<any>
+      startDownload: () => Promise<void>
+      installUpdate: () => Promise<void>
+      onUpdateStatus: (callback: (data: { status: string, data?: any }) => void) => () => void
     }
   }
 }

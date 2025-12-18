@@ -1,9 +1,11 @@
 import { registerIPCHandlers } from './ipc'
+import { initializeUpdater } from './updater'
 import {
   stopWorkspace,
   getHectorStatus,
   startWorkspace,
-  isHectorInstalled
+  isHectorInstalled,
+  checkForUpdates
 } from './hector/manager'
 import { serverManager } from './servers/manager'
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
@@ -40,33 +42,44 @@ function createWindow(): BrowserWindow {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
-  
+
   if (process.platform === 'darwin' && is.dev) {
     app.dock?.setIcon(icon)
   }
-  
+
   return mainWindow
 }
 
 async function initializeApp(): Promise<void> {
   // Only create and start workspaces if hector is installed
-  // This allows remote-only mode without local workspaces
+  let needsRuntimeUpdate = false
+
   if (isHectorInstalled()) {
+    try {
+      const updates = await checkForUpdates()
+      needsRuntimeUpdate = updates.hasUpdate
+      if (needsRuntimeUpdate) {
+        console.log('[main] Runtime update required:', updates)
+      }
+    } catch (err) {
+      console.error('[main] Failed to check for updates:', err)
+    }
+
     const servers = serverManager.getServers()
-    
+
     // Create default workspace if none exist
     if (servers.filter(s => s.isLocal).length === 0) {
       const documentsPath = app.getPath('documents')
       const defaultPath = join(documentsPath, 'Hector', 'Default')
       mkdirSync(defaultPath, { recursive: true })
-      
+
       console.log('[main] Creating default workspace:', defaultPath)
       serverManager.addWorkspace('Default', defaultPath)
     }
-    
-    // Auto-start active workspace
+
+    // Auto-start active workspace only if no update needed
     const activeWorkspace = serverManager.getActiveWorkspace()
-    if (activeWorkspace) {
+    if (activeWorkspace && !needsRuntimeUpdate) {
       console.log(`[main] Auto-starting workspace: ${activeWorkspace.name}`)
       try {
         await startWorkspace(activeWorkspace)
@@ -77,12 +90,13 @@ async function initializeApp(): Promise<void> {
   } else {
     console.log('[main] Hector not installed, skipping workspace creation')
   }
-  
+
   // Notify renderer that app is ready with status info
   const readyPayload = {
     hectorInstalled: isHectorInstalled(),
     hasWorkspaces: serverManager.getServers().filter(s => s.isLocal).length > 0,
-    workspacesEnabled: serverManager.getWorkspacesEnabled()
+    workspacesEnabled: serverManager.getWorkspacesEnabled(),
+    needsRuntimeUpdate
   }
   console.log('[main] App ready:', readyPayload)
   BrowserWindow.getAllWindows().forEach(win => {
@@ -96,11 +110,11 @@ app.whenReady().then(async () => {
   if (is.dev) {
     app.setName('Hector Studio')
   }
-  
+
   app.setAboutPanelOptions({
     applicationName: 'Hector Studio',
-    applicationVersion: '0.1.3',
-    version: '0.1.3',
+    applicationVersion: app.getVersion(),
+    version: app.getVersion(),
     iconPath: is.dev ? join(app.getAppPath(), 'resources/icon.png') : undefined,
   })
 
@@ -111,9 +125,10 @@ app.whenReady().then(async () => {
   ipcMain.on('ping', () => console.log('pong'))
 
   registerIPCHandlers()
+  initializeUpdater()
 
   const mainWindow = createWindow()
-  
+
   // Initialize app after window is ready
   mainWindow.webContents.once('did-finish-load', () => {
     initializeApp().catch(err => {

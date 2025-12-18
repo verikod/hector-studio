@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Monitor } from "lucide-react";
+import { X, Monitor, RefreshCw } from "lucide-react";
 import { useStore } from "../../store/useStore";
 
 interface SettingsModalProps {
@@ -111,6 +111,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <p className="text-xs text-gray-500 mt-1">
                 Color scheme for the YAML editor
               </p>
+            </div>
+
+            {/* Updates */}
+            <div className="pt-4 border-t border-white/10">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Application Updates
+              </label>
+              <button
+                onClick={() => window.api.app.checkUpdate()}
+                className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={14} />
+                Check for Updates
+              </button>
             </div>
           </div>
 

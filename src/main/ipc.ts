@@ -12,17 +12,18 @@ import {
   startWorkspace,
   getHectorStatus,
   getActiveWorkspaceId,
-  checkForUpdates
+  checkForUpdates,
+  upgradeHector
 } from './hector/manager'
 
 export function registerIPCHandlers(): void {
   // Server Management
   ipcMain.handle('server:list', () => serverManager.getServers())
-  
+
   ipcMain.handle('server:add', async (_, { name, url }) => {
     return serverManager.addServer(name, url)
   })
-  
+
   ipcMain.handle('server:remove', async (_, id) => {
     serverManager.removeServer(id)
   })
@@ -50,90 +51,90 @@ export function registerIPCHandlers(): void {
       properties: ['openDirectory', 'createDirectory'],
       buttonLabel: 'Select Workspace'
     })
-    
+
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
-    
+
     return result.filePaths[0]
   })
-  
+
   ipcMain.handle('workspace:add', async (_, { name, path }) => {
     return serverManager.addWorkspace(name, path)
   })
-  
+
   ipcMain.handle('workspace:switch', async (_, id) => {
     return switchWorkspace(id)
   })
-  
+
   ipcMain.handle('workspace:stop', async () => {
     return stopWorkspace()
   })
-  
+
   ipcMain.handle('workspace:start', async (_, id) => {
     return switchWorkspace(id)
   })
-  
+
   ipcMain.handle('workspace:get-active', () => {
     return getActiveWorkspaceId()
   })
-  
+
   // Create default workspace after hector download
   ipcMain.handle('workspace:create-default', async () => {
     const documentsPath = app.getPath('documents')
     const defaultPath = join(documentsPath, 'Hector', 'Default')
     mkdirSync(defaultPath, { recursive: true })
-    
+
     console.log('[ipc] Creating default workspace:', defaultPath)
     const workspace = serverManager.addWorkspace('Default', defaultPath)
-    
+
     if (workspace) {
       console.log('[ipc] Starting default workspace:', workspace.id)
       await startWorkspace(workspace)
     }
-    
+
     return workspace
   })
-  
+
   // Workspaces feature toggle
   ipcMain.handle('workspaces:is-enabled', () => {
     return serverManager.getWorkspacesEnabled()
   })
-  
+
   ipcMain.handle('workspaces:enable', async () => {
     console.log('[ipc] Enabling workspaces...')
-    
+
     // Download hector if not installed
     if (!isHectorInstalled()) {
       console.log('[ipc] Downloading hector...')
       await downloadHector()
     }
-    
+
     // Create default workspace if no workspaces exist
     const servers = serverManager.getServers()
     const localWorkspaces = servers.filter(s => s.isLocal)
-    
+
     if (localWorkspaces.length === 0) {
       const documentsPath = app.getPath('documents')
       const defaultPath = join(documentsPath, 'Hector', 'Default')
       mkdirSync(defaultPath, { recursive: true })
-      
+
       console.log('[ipc] Creating default workspace:', defaultPath)
       const workspace = serverManager.addWorkspace('Default', defaultPath)
-      
+
       if (workspace) {
         console.log('[ipc] Starting default workspace:', workspace.id)
         await startWorkspace(workspace)
       }
     }
-    
+
     // Enable workspaces feature
     serverManager.setWorkspacesEnabled(true)
     console.log('[ipc] Workspaces enabled')
-    
+
     return { success: true }
   })
-  
+
   ipcMain.handle('workspaces:disable', () => {
     console.log('[ipc] Disabling workspaces')
     serverManager.setWorkspacesEnabled(false)
@@ -162,16 +163,20 @@ export function registerIPCHandlers(): void {
 
   // Hector Binary Management
   ipcMain.handle('hector:is-installed', () => isHectorInstalled())
-  
+
   ipcMain.handle('hector:get-version', () => getInstalledVersion())
-  
+
   ipcMain.handle('hector:download', async (_, version?: string) => {
     return downloadHector(version)
   })
-  
+
   ipcMain.handle('hector:get-status', () => getHectorStatus())
-  
+
   ipcMain.handle('hector:check-updates', async () => {
     return checkForUpdates()
+  })
+
+  ipcMain.handle('hector:upgrade', async () => {
+    return upgradeHector()
   })
 }

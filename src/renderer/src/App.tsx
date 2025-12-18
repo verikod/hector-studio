@@ -13,9 +13,11 @@ import { LoginModal } from "./components/LoginModal";
 import { InitializationCover } from "./components/InitializationCover";
 import { WelcomeCover } from "./components/WelcomeCover";
 import { EnableWorkspacesModal } from "./components/EnableWorkspacesModal";
+import { UpdateNotification } from "./components/UpdateNotification";
+import { UpdateRuntimeCover } from "./components/UpdateRuntimeCover";
 
 // App lifecycle states
-type AppState = 'initializing' | 'needs_download' | 'downloading' | 'ready';
+type AppState = 'initializing' | 'needs_download' | 'needs_update' | 'downloading' | 'ready';
 
 function App() {
   // App lifecycle state machine
@@ -32,7 +34,10 @@ function App() {
       // Determine initial app state
       if (payload.workspacesEnabled && !payload.hectorInstalled) {
         // Workspaces enabled but hector missing - shouldn't happen normally
+        // Workspaces enabled but hector missing - shouldn't happen normally
         setAppState('needs_download');
+      } else if (payload.needsRuntimeUpdate) {
+        setAppState('needs_update');
       } else {
         // Either workspaces disabled (remote-only) or all good
         setAppState('ready');
@@ -206,6 +211,16 @@ function App() {
     );
   }
 
+  if (appState === 'needs_update') {
+    return (
+      <UpdateRuntimeCover
+        onUpdate={async () => {
+          await window.api.hector.upgrade();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col w-screen h-screen bg-black text-white overflow-hidden font-sans">
       {/* Unified Header */}
@@ -265,6 +280,7 @@ function App() {
         onClose={() => setShowEnableWorkspacesModal(false)}
         onComplete={handleEnableWorkspacesComplete}
       />
+      <UpdateNotification />
       <ErrorDisplay />
       <SuccessDisplay />
     </div>
