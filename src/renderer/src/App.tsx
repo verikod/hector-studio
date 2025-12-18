@@ -11,23 +11,56 @@ import { UnifiedHeader } from "./components/UnifiedHeader";
 import { CoverOverlay } from "./components/CoverOverlay";
 import { LoginModal } from "./components/LoginModal";
 import { InitializationCover } from "./components/InitializationCover";
+import { WelcomeCover } from "./components/WelcomeCover";
+
+// App lifecycle states
+type AppState = 'initializing' | 'needs_download' | 'downloading' | 'ready';
 
 function App() {
-  // App initialization state
-  const [appReady, setAppReady] = useState(false);
+  // App lifecycle state machine
+  const [appState, setAppState] = useState<AppState>('initializing');
 
   // Listen for app:ready event from main process
   useEffect(() => {
-    const unsubscribe = window.api.app.onReady(() => {
-      setAppReady(true);
+    const unsubscribe = window.api.app.onReady((payload) => {
+      console.log('[App] Received app:ready:', payload);
+      if (!payload.hectorInstalled) {
+        setAppState('needs_download');
+      } else {
+        setAppState('ready');
+      }
     });
     return unsubscribe;
   }, []);
 
-  // Initialize servers from main process
+  // Handle hector download
+  const handleDownloadHector = async () => {
+    setAppState('downloading');
+    try {
+      await window.api.hector.download();
+      // After download, start the default workspace
+      const workspaceId = await window.api.workspace.getActive();
+      if (workspaceId) {
+        await window.api.workspace.start(workspaceId);
+      }
+      setAppState('ready');
+    } catch (error) {
+      console.error('Download failed:', error);
+      setAppState('needs_download');
+      throw error;
+    }
+  };
+
+  // Handle add remote server from welcome screen
+  const handleAddRemoteServer = () => {
+    // Skip to ready state - user will use server selector to add remote
+    setAppState('ready');
+  };
+
+  // Initialize servers from main process (only when ready)
   useServersInit();
 
-  // Poll active server health every 10s
+  // Poll active server health every 10s (only when ready)
   useHealthPolling();
 
   const loadAgents = useStore((state) => state.loadAgents);
@@ -132,9 +165,18 @@ function App() {
 
   const loginServer = loginServerId ? useServersStore.getState().servers[loginServerId] : null;
 
-  // Show initialization cover until app is ready
-  if (!appReady) {
+  // Show covers based on app state
+  if (appState === 'initializing') {
     return <InitializationCover />;
+  }
+
+  if (appState === 'needs_download' || appState === 'downloading') {
+    return (
+      <WelcomeCover
+        onDownloadHector={handleDownloadHector}
+        onAddRemoteServer={handleAddRemoteServer}
+      />
+    );
   }
 
   return (

@@ -60,8 +60,8 @@ const api = {
   
   // App lifecycle
   app: {
-    onReady: (callback: () => void) => {
-      const handler = () => callback()
+    onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean }) => void) => {
+      const handler = (_event: any, payload: { hectorInstalled: boolean, hasWorkspaces: boolean }) => callback(payload)
       ipcRenderer.on('app:ready', handler)
       return () => ipcRenderer.removeListener('app:ready', handler)
     }

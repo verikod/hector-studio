@@ -59,7 +59,7 @@ declare global {
       checkUpdates: () => Promise<{ hasUpdate: boolean, currentVersion: string | null, latestVersion: string }>
     }
     app: {
-      onReady: (callback: () => void) => () => void
+      onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean }) => void) => () => void
     }
   }
 }

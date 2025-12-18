@@ -75,9 +75,14 @@ async function initializeApp(): Promise<void> {
     console.log('[main] Hector not installed, skipping workspace auto-start')
   }
   
-  // Notify renderer that app is ready
+  // Notify renderer that app is ready with status info
+  const readyPayload = {
+    hectorInstalled: isHectorInstalled(),
+    hasWorkspaces: serverManager.getServers().length > 0
+  }
+  console.log('[main] App ready:', readyPayload)
   BrowserWindow.getAllWindows().forEach(win => {
-    win.webContents.send('app:ready')
+    win.webContents.send('app:ready', readyPayload)
   })
 }
 
