@@ -15,7 +15,6 @@ import { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync } from 
 import { readFile, writeFile } from 'fs/promises'
 import { get as httpsGet } from 'https'
 import { pipeline } from 'stream/promises'
-import { setTrayState } from '../tray'
 import { serverManager, ServerConfig } from '../servers/manager'
 
 // Hector compatibility - should match Studio release
@@ -432,12 +431,6 @@ export function onHectorLog(
 
 function setStatus(status: HectorStatus, error?: string): void {
   currentStatus = status
-  
-  const trayState = status === 'running' ? 'running'
-    : status === 'starting' ? 'starting'
-    : status === 'error' ? 'error'
-    : 'stopped'
-  setTrayState(trayState)
   
   onStatusChange?.(status, error)
   

@@ -31,6 +31,7 @@ const api = {
     add: (name: string, path: string) => ipcRenderer.invoke('workspace:add', { name, path }),
     switch: (id: string) => ipcRenderer.invoke('workspace:switch', id),
     stop: () => ipcRenderer.invoke('workspace:stop'),
+    start: (id: string) => ipcRenderer.invoke('workspace:start', id),
     getActive: () => ipcRenderer.invoke('workspace:get-active')
   },
   
@@ -55,6 +56,15 @@ const api = {
     download: (version?: string) => ipcRenderer.invoke('hector:download', version),
     getStatus: () => ipcRenderer.invoke('hector:get-status'),
     checkUpdates: () => ipcRenderer.invoke('hector:check-updates')
+  },
+  
+  // App lifecycle
+  app: {
+    onReady: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:ready', handler)
+      return () => ipcRenderer.removeListener('app:ready', handler)
+    }
   }
 }
 

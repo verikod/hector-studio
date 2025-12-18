@@ -41,6 +41,7 @@ declare global {
       add: (name: string, path: string) => Promise<ServerConfig>
       switch: (id: string) => Promise<void>
       stop: () => Promise<void>
+      start: (id: string) => Promise<void>
       getActive: () => Promise<string | null>
     }
     auth: {
@@ -56,6 +57,9 @@ declare global {
       download: (version?: string) => Promise<void>
       getStatus: () => Promise<string>
       checkUpdates: () => Promise<{ hasUpdate: boolean, currentVersion: string | null, latestVersion: string }>
+    }
+    app: {
+      onReady: (callback: () => void) => () => void
     }
   }
 }

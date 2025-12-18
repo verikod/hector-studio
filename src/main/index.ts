@@ -1,19 +1,17 @@
 import { registerIPCHandlers } from './ipc'
-import { createTray, registerTrayCallbacks, destroyTray } from './tray'
 import {
   stopWorkspace,
-  downloadHector,
-  checkForUpdates,
   getHectorStatus,
   startWorkspace
 } from './hector/manager'
 import { serverManager } from './servers/manager'
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { mkdirSync } from 'fs'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
@@ -45,9 +43,37 @@ function createWindow(): void {
   if (process.platform === 'darwin' && is.dev) {
     app.dock?.setIcon(icon)
   }
+  
+  return mainWindow
 }
 
-app.whenReady().then(() => {
+async function initializeApp(): Promise<void> {
+  // Create default workspace if none exist
+  const servers = serverManager.getServers()
+  if (servers.length === 0) {
+    const documentsPath = app.getPath('documents')
+    const defaultPath = join(documentsPath, 'Hector', 'Default')
+    mkdirSync(defaultPath, { recursive: true })
+    
+    console.log('[main] Creating default workspace:', defaultPath)
+    const defaultWorkspace = serverManager.addWorkspace('Default', defaultPath)
+    await startWorkspace(defaultWorkspace)
+  } else {
+    // Auto-start last active workspace
+    const activeWorkspace = serverManager.getActiveWorkspace()
+    if (activeWorkspace) {
+      console.log(`[main] Auto-starting last active workspace: ${activeWorkspace.name}`)
+      await startWorkspace(activeWorkspace)
+    }
+  }
+  
+  // Notify renderer that app is ready
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.webContents.send('app:ready')
+  })
+}
+
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
 
   if (is.dev) {
@@ -69,73 +95,25 @@ app.whenReady().then(() => {
 
   registerIPCHandlers()
 
-  // Create system tray
-  createTray()
+  const mainWindow = createWindow()
   
-  // Register callbacks for tray actions that need window creation
-  registerTrayCallbacks({
-    onOpenStudio: () => {
-      createWindow()
-    },
-    onOpenPreferences: () => {
-      console.log('[tray] Preferences requested')
-    },
-    onCheckUpdates: async () => {
-      try {
-        const { hasUpdate, currentVersion, latestVersion } = await checkForUpdates()
-        if (hasUpdate) {
-          const result = await dialog.showMessageBox({
-            type: 'info',
-            buttons: ['Update', 'Later'],
-            defaultId: 0,
-            title: 'Update Available',
-            message: `Hector ${latestVersion} is available (you have ${currentVersion || 'none'}).`
-          })
-          
-          if (result.response === 0) {
-            await downloadHector(latestVersion)
-            dialog.showMessageBox({
-              type: 'info',
-              title: 'Update Complete',
-              message: `Hector has been updated to v${latestVersion}.`
-            })
-          }
-        } else {
-          dialog.showMessageBox({
-            type: 'info',
-            title: 'No Updates',
-            message: `You have the latest version${currentVersion ? ` (v${currentVersion})` : ''}.`
-          })
-        }
-      } catch (err) {
-        console.error('[main] Failed to check updates:', err)
-        dialog.showErrorBox('Update Check Failed', String(err))
-      }
-    }
-  })
-
-  // Auto-start last active workspace
-  const activeWorkspace = serverManager.getActiveWorkspace()
-  if (activeWorkspace) {
-    console.log(`[main] Auto-starting last active workspace: ${activeWorkspace.name}`)
-    // Don't await this, let it start in background
-    startWorkspace(activeWorkspace).catch(err => {
-      console.error('[main] Failed to auto-start workspace:', err)
+  // Initialize app after window is ready
+  mainWindow.webContents.once('did-finish-load', () => {
+    initializeApp().catch(err => {
+      console.error('[main] Initialization failed:', err)
+      // Still emit ready so app doesn't hang
+      mainWindow.webContents.send('app:ready')
     })
-  }
-
-  createWindow()
+  })
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Keep app running in tray when all windows closed
+// Quit when all windows are closed
 app.on('window-all-closed', () => {
-  if (process.platform === 'darwin') {
-    app.dock?.hide()
-  }
+  app.quit()
 })
 
 // Clean up on quit
@@ -144,5 +122,5 @@ app.on('before-quit', async () => {
     console.log('[main] Stopping workspace before quit...')
     await stopWorkspace()
   }
-  destroyTray()
 })
+

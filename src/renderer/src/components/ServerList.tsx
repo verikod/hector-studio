@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Trash2, LogIn, LogOut, FolderOpen, Globe } from "lucide-react";
+import { Trash2, LogIn, LogOut, FolderOpen, Globe, Play, Square } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useServersStore } from "../store/serversStore";
 import type { ServerConfig } from "../types";
@@ -143,6 +143,16 @@ export const ServerList: React.FC<ServerListProps> = ({ onSelectCallback, onLogi
         checkAuthStatus();
     };
 
+    const handleStartWorkspace = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        await window.api.workspace.start(id);
+    };
+
+    const handleStopWorkspace = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        await window.api.workspace.stop();
+    };
+
     const handleLoginClick = (server: ServerConfig, e: React.MouseEvent) => {
         e.stopPropagation();
         onLoginRequest(server);
@@ -185,8 +195,12 @@ export const ServerList: React.FC<ServerListProps> = ({ onSelectCallback, onLogi
                         key={server.id}
                         server={server}
                         isActive={activeServerId === server.id}
+                        isLocal={true}
+                        status={authStatus[server.id] ? 'authenticated' : 'stopped'}
                         onSelect={handleSelectServer}
                         onRemove={handleRemoveServer}
+                        onStart={handleStartWorkspace}
+                        onStop={handleStopWorkspace}
                         authStatus={!!authStatus[server.id]}
                         onLogin={handleLoginClick}
                         onLogout={handleLogout}
@@ -304,70 +318,115 @@ export const ServerList: React.FC<ServerListProps> = ({ onSelectCallback, onLogi
 const ServerItem: React.FC<{
     server: ServerConfig;
     isActive: boolean;
+    isLocal?: boolean;
+    status?: string;
     onSelect: (s: ServerConfig) => void;
     onRemove: (id: string, e: React.MouseEvent) => void;
+    onStart?: (id: string, e: React.MouseEvent) => void;
+    onStop?: (e: React.MouseEvent) => void;
     authStatus: boolean;
     onLogin: (s: ServerConfig, e: React.MouseEvent) => void;
     onLogout: (s: ServerConfig, e: React.MouseEvent) => void;
     icon: React.ReactNode;
     detail: string;
-}> = ({ server, isActive, onSelect, onRemove, authStatus, onLogin, onLogout, icon, detail }) => (
-    <div
-        onClick={() => onSelect(server)}
-        className={cn(
-            "group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border",
-            isActive
-                ? "bg-hector-green/10 border-hector-green/50 text-white"
-                : "bg-transparent border-transparent hover:bg-white/5 text-gray-400 hover:text-gray-200"
-        )}
-    >
-        <div className={cn(
-            "p-2 rounded-lg",
-            isActive ? "bg-hector-green/20 text-hector-green" : "bg-white/5 text-gray-500"
-        )}>
-            {icon}
-        </div>
+}> = ({ server, isActive, isLocal, status, onSelect, onRemove, onStart, onStop, authStatus, onLogin, onLogout, icon, detail }) => {
+    const isRunning = status === 'authenticated' || status === 'checking';
+    const isStopped = status === 'stopped' || status === 'added';
 
-        <div className="flex-1 min-w-0">
-            <div className="font-medium truncate">{server.name}</div>
-            <div className="text-xs text-gray-500 truncate">{detail}</div>
-        </div>
+    return (
+        <div
+            onClick={() => onSelect(server)}
+            className={cn(
+                "group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border",
+                isActive
+                    ? "bg-hector-green/10 border-hector-green/50 text-white"
+                    : "bg-transparent border-transparent hover:bg-white/5 text-gray-400 hover:text-gray-200"
+            )}
+        >
+            <div className={cn(
+                "p-2 rounded-lg",
+                isActive ? "bg-hector-green/20 text-hector-green" : "bg-white/5 text-gray-500"
+            )}>
+                {icon}
+            </div>
 
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {authStatus ? (
+            <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{server.name}</div>
+                <div className="text-xs text-gray-500 truncate flex items-center gap-2">
+                    <span>{detail}</span>
+                    {isLocal && status && (
+                        <span className={cn(
+                            "text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded",
+                            isRunning ? "bg-green-500/20 text-green-400" :
+                                isStopped ? "bg-gray-500/20 text-gray-400" :
+                                    "bg-yellow-500/20 text-yellow-400"
+                        )}>
+                            {status === 'checking' ? 'Starting' : status === 'authenticated' ? 'Running' : status}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Start/Stop for local workspaces */}
+                {isLocal && (
+                    <>
+                        {isStopped && onStart && (
+                            <button
+                                onClick={(e) => onStart(server.id, e)}
+                                title="Start Workspace"
+                                className="p-1.5 hover:bg-green-500/20 hover:text-green-400 rounded transition-colors"
+                            >
+                                <Play size={14} />
+                            </button>
+                        )}
+                        {isRunning && onStop && (
+                            <button
+                                onClick={(e) => onStop(e)}
+                                title="Stop Workspace"
+                                className="p-1.5 hover:bg-orange-500/20 hover:text-orange-400 rounded transition-colors"
+                            >
+                                <Square size={14} />
+                            </button>
+                        )}
+                    </>
+                )}
+
+                {authStatus ? (
+                    <button
+                        onClick={(e) => onLogout(server, e)}
+                        title="Logout"
+                        className="p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded transition-colors"
+                    >
+                        <LogOut size={14} />
+                    </button>
+                ) : (
+                    <button
+                        onClick={(e) => onLogin(server, e)}
+                        title="Login"
+                        className={cn(
+                            "p-1.5 rounded transition-colors",
+                            isActive ? "text-yellow-400 hover:bg-yellow-400/20" : "hover:bg-white/10"
+                        )}
+                    >
+                        <LogIn size={14} />
+                    </button>
+                )}
+
                 <button
-                    onClick={(e) => onLogout(server, e)}
-                    title="Logout"
+                    onClick={(e) => onRemove(server.id, e)}
                     className="p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded transition-colors"
                 >
-                    <LogOut size={14} />
+                    <Trash2 size={14} />
                 </button>
-            ) : (
-                <button
-                    onClick={(e) => onLogin(server, e)}
-                    title="Login"
-                    className={cn(
-                        "p-1.5 rounded transition-colors",
-                        isActive ? "text-yellow-400 hover:bg-yellow-400/20" : "hover:bg-white/10"
-                    )}
-                >
-                    <LogIn size={14} />
-                </button>
-            )}
+            </div>
 
-            <button
-                onClick={(e) => onRemove(server.id, e)}
-                className="p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded transition-colors"
-            >
-                <Trash2 size={14} />
-            </button>
+            {/* Status Indicator Dot */}
+            <div className="absolute top-2 right-2">
+                {isRunning && (
+                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                )}
+            </div>
         </div>
-
-        {/* Auth Indicator Dot */}
-        <div className="absolute top-2 right-2">
-            {authStatus && (
-                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-            )}
-        </div>
-    </div>
-);
+    );
+};

@@ -67,6 +67,10 @@ export function registerIPCHandlers(): void {
     return stopWorkspace()
   })
   
+  ipcMain.handle('workspace:start', async (_, id) => {
+    return switchWorkspace(id)
+  })
+  
   ipcMain.handle('workspace:get-active', () => {
     return getActiveWorkspaceId()
   })

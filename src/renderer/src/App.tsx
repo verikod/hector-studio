@@ -10,8 +10,20 @@ import { useHealthPolling } from "./lib/hooks/useHealthPolling";
 import { UnifiedHeader } from "./components/UnifiedHeader";
 import { CoverOverlay } from "./components/CoverOverlay";
 import { LoginModal } from "./components/LoginModal";
+import { InitializationCover } from "./components/InitializationCover";
 
 function App() {
+  // App initialization state
+  const [appReady, setAppReady] = useState(false);
+
+  // Listen for app:ready event from main process
+  useEffect(() => {
+    const unsubscribe = window.api.app.onReady(() => {
+      setAppReady(true);
+    });
+    return unsubscribe;
+  }, []);
+
   // Initialize servers from main process
   useServersInit();
 
@@ -119,6 +131,11 @@ function App() {
   };
 
   const loginServer = loginServerId ? useServersStore.getState().servers[loginServerId] : null;
+
+  // Show initialization cover until app is ready
+  if (!appReady) {
+    return <InitializationCover />;
+  }
 
   return (
     <div className="flex flex-col w-screen h-screen bg-black text-white overflow-hidden font-sans">
