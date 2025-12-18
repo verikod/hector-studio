@@ -11,6 +11,10 @@ declare global {
     name: string
     url: string
     lastUsed: number
+    isLocal?: boolean
+    workspacePath?: string
+    port?: number
+    auth?: AuthConfig
   }
 
   type AuthConfig = {
@@ -18,6 +22,7 @@ declare global {
     type: string
     issuer: string
     audience: string
+    clientId?: string
   }
 
   interface HectorAPI {
@@ -28,12 +33,29 @@ declare global {
       getActive: () => Promise<ServerConfig | null>
       setActive: (id: string) => Promise<void>
       discoverAuth: (url: string) => Promise<AuthConfig | null>
+      onServersUpdated: (callback: (servers: ServerConfig[]) => void) => () => void
+      onServerStatusChange: (callback: (data: { id: string, status: string, error?: string }) => void) => () => void
+    }
+    workspace: {
+      browse: () => Promise<string | null>
+      add: (name: string, path: string) => Promise<ServerConfig>
+      switch: (id: string) => Promise<void>
+      stop: () => Promise<void>
+      getActive: () => Promise<string | null>
     }
     auth: {
       login: (url: string) => Promise<void>
       logout: (url: string) => Promise<void>
       getToken: (url: string) => Promise<string | null>
       isAuthenticated: (url: string) => Promise<boolean>
+      onAuthStatusChange: (callback: (data: { url: string, authenticated: boolean }) => void) => () => void
+    }
+    hector: {
+      isInstalled: () => Promise<boolean>
+      getVersion: () => Promise<string | null>
+      download: (version?: string) => Promise<void>
+      getStatus: () => Promise<string>
+      checkUpdates: () => Promise<{ hasUpdate: boolean, currentVersion: string | null, latestVersion: string }>
     }
   }
 }

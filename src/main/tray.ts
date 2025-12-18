@@ -2,17 +2,23 @@
  * Hector System Tray Manager
  * 
  * Provides a system tray icon with menu for:
- * - Starting/stopping local Hector server
+ * - Opening/switching workspaces
+ * - Managing the local Hector server
  * - Opening the main Studio window
- * - Accessing preferences and updates
  * - Quitting the application
- * 
- * Follows Docker Desktop pattern: tray persists even when main window is closed.
  */
 
-import { Tray, Menu, nativeImage, app, BrowserWindow } from 'electron'
-import { join } from 'path'
+import { Tray, Menu, nativeImage, app, BrowserWindow, dialog } from 'electron'
+import { join, basename } from 'path'
 import { is } from '@electron-toolkit/utils'
+import { serverManager } from './servers/manager'
+import { 
+  startWorkspace, 
+  stopWorkspace, 
+  getActiveWorkspaceId,
+  isHectorInstalled,
+  downloadHector
+} from './hector/manager'
 
 // Tray icon states
 type TrayState = 'stopped' | 'starting' | 'running' | 'error'
@@ -20,30 +26,22 @@ type TrayState = 'stopped' | 'starting' | 'running' | 'error'
 let tray: Tray | null = null
 let currentState: TrayState = 'stopped'
 
-// Callbacks for tray actions
-let onStartHector: (() => void) | null = null
-let onStopHector: (() => void) | null = null
+// Callbacks
 let onOpenStudio: (() => void) | null = null
 let onOpenPreferences: (() => void) | null = null
 let onCheckUpdates: (() => void) | null = null
 
 /**
  * Create the system tray icon and menu.
- * Should be called once during app initialization.
  */
 export function createTray(): Tray {
-  // Get icon path - use the same icon for now, system will adapt
   const iconPath = is.dev 
     ? join(app.getAppPath(), 'resources/icon.png')
     : join(__dirname, '../../resources/icon.png')
   
-  // Create a native image and resize for tray (16x16 on most platforms)
   let icon = nativeImage.createFromPath(iconPath)
-  
-  // Resize for tray - macOS expects 16x16 or 22x22, Windows 16x16
   icon = icon.resize({ width: 16, height: 16 })
   
-  // On macOS, set as template image for proper dark/light mode handling
   if (process.platform === 'darwin') {
     icon.setTemplateImage(true)
   }
@@ -53,7 +51,6 @@ export function createTray(): Tray {
   
   updateTrayMenu()
   
-  // Handle tray click - show Studio window
   tray.on('click', () => {
     showStudioWindow()
   })
@@ -62,55 +59,68 @@ export function createTray(): Tray {
 }
 
 /**
- * Update the tray menu based on current state.
+ * Update the tray menu based on current state and workspaces.
  */
-function updateTrayMenu(): void {
+export function updateTrayMenu(): void {
   if (!tray) return
   
+  const workspaces = serverManager.getWorkspaces()
+  const activeWorkspaceId = getActiveWorkspaceId()
   const isRunning = currentState === 'running'
-  const isStarting = currentState === 'starting'
   
   const statusLabel = getStatusLabel()
+  
+  // Build workspace submenu
+  const workspaceItems: Electron.MenuItemConstructorOptions[] = workspaces.map(ws => ({
+    label: `${ws.name} (${basename(ws.workspacePath || '')})`,
+    type: 'checkbox' as const,
+    checked: ws.id === activeWorkspaceId,
+    click: async () => {
+      try {
+        await startWorkspace(ws)
+        updateTrayMenu()
+      } catch (err) {
+        console.error('[tray] Failed to start workspace:', err)
+      }
+    }
+  }))
+  
+  if (workspaceItems.length > 0) {
+    workspaceItems.push({ type: 'separator' })
+  }
+  
+  workspaceItems.push({
+    label: 'Open Workspace...',
+    click: async () => {
+      await openWorkspaceDialog()
+    }
+  })
   
   const contextMenu = Menu.buildFromTemplate([
     {
       label: statusLabel,
       enabled: false,
-      icon: getStatusIcon(),
     },
     { type: 'separator' },
     
-    // Start/Stop Hector
+    // Workspaces submenu
     {
-      label: isRunning ? 'Stop Hector' : 'Start Hector',
-      enabled: !isStarting,
-      click: () => {
-        if (isRunning) {
-          onStopHector?.()
-        } else {
-          onStartHector?.()
-        }
+      label: 'Workspaces',
+      submenu: workspaceItems
+    },
+    
+    // Stop current workspace
+    {
+      label: 'Stop Workspace',
+      enabled: isRunning,
+      click: async () => {
+        await stopWorkspace()
+        updateTrayMenu()
       }
     },
     { type: 'separator' },
     
-    // Workspace (placeholder for now)
-    {
-      label: 'Workspace: ~/hector-workspace',
-      enabled: false,
-    },
-    {
-      label: 'Change Workspace...',
-      enabled: false, // TODO: Implement in Phase 4
-    },
-    { type: 'separator' },
-    
     // Settings
-    {
-      label: 'Environment Variables...',
-      enabled: false, // TODO: Implement in Phase 4
-      click: () => onOpenPreferences?.()
-    },
     {
       label: 'Preferences...',
       click: () => onOpenPreferences?.()
@@ -131,10 +141,9 @@ function updateTrayMenu(): void {
     // Quit
     {
       label: 'Quit',
-      click: () => {
-        // Stop Hector if running, then quit
+      click: async () => {
         if (currentState === 'running') {
-          onStopHector?.()
+          await stopWorkspace()
         }
         app.quit()
       }
@@ -145,34 +154,74 @@ function updateTrayMenu(): void {
 }
 
 /**
- * Get the status label for the current state.
+ * Open a folder dialog to add a new workspace.
  */
+async function openWorkspaceDialog(): Promise<void> {
+  const result = await dialog.showOpenDialog({
+    title: 'Select Workspace Folder',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Open Workspace'
+  })
+  
+  if (result.canceled || result.filePaths.length === 0) {
+    return
+  }
+  
+  const workspacePath = result.filePaths[0]
+  const name = basename(workspacePath)
+  
+  try {
+    // Check if Hector is installed
+    if (!isHectorInstalled()) {
+      const downloadResult = await dialog.showMessageBox({
+        type: 'question',
+        buttons: ['Download', 'Cancel'],
+        title: 'Hector Not Installed',
+        message: 'Hector is not installed. Would you like to download it?'
+      })
+      
+      if (downloadResult.response === 0) {
+        await downloadHector()
+      } else {
+        return
+      }
+    }
+    
+    // Add workspace and start it
+    const workspace = serverManager.addWorkspace(name, workspacePath)
+    await startWorkspace(workspace)
+    updateTrayMenu()
+    
+    // Notify renderers
+    const servers = serverManager.getServers()
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.webContents.send('servers:updated', servers)
+    })
+  } catch (err: any) {
+    console.error('[tray] Failed to add workspace:', err)
+    dialog.showErrorBox('Failed to Open Workspace', err.message)
+  }
+}
+
 function getStatusLabel(): string {
+  const activeId = getActiveWorkspaceId()
+  const workspace = activeId ? serverManager.getServer(activeId) : null
+  const wsName = workspace ? ` - ${workspace.name}` : ''
+  
   switch (currentState) {
     case 'stopped':
-      return '⚪ Hector is stopped'
+      return '⚪ Hector stopped'
     case 'starting':
-      return '🟡 Hector is starting...'
+      return `🟡 Starting${wsName}...`
     case 'running':
-      return '🟢 Hector is running'
+      return `🟢 Running${wsName}`
     case 'error':
-      return '🔴 Hector error'
+      return '🔴 Error'
     default:
       return '⚪ Hector'
   }
 }
 
-/**
- * Get the status icon for the menu (optional, may not work on all platforms).
- */
-function getStatusIcon(): Electron.NativeImage | undefined {
-  // Return undefined for now - emoji in label is sufficient
-  return undefined
-}
-
-/**
- * Show the main Studio window, creating it if needed.
- */
 function showStudioWindow(): void {
   const windows = BrowserWindow.getAllWindows()
   
@@ -182,7 +231,6 @@ function showStudioWindow(): void {
     win.show()
     win.focus()
   } else {
-    // Need to create window - call the provided callback
     onOpenStudio?.()
   }
 }
@@ -194,15 +242,11 @@ export function setTrayState(state: TrayState): void {
   currentState = state
   updateTrayMenu()
   
-  // Update tooltip
   if (tray) {
     tray.setToolTip(`Hector - ${getStatusLabel().replace(/[⚪🟡🟢🔴] /, '')}`)
   }
 }
 
-/**
- * Get the current tray state.
- */
 export function getTrayState(): TrayState {
   return currentState
 }
@@ -211,22 +255,15 @@ export function getTrayState(): TrayState {
  * Register callbacks for tray menu actions.
  */
 export function registerTrayCallbacks(callbacks: {
-  onStartHector?: () => void
-  onStopHector?: () => void
   onOpenStudio?: () => void
   onOpenPreferences?: () => void
   onCheckUpdates?: () => void
 }): void {
-  if (callbacks.onStartHector) onStartHector = callbacks.onStartHector
-  if (callbacks.onStopHector) onStopHector = callbacks.onStopHector
   if (callbacks.onOpenStudio) onOpenStudio = callbacks.onOpenStudio
   if (callbacks.onOpenPreferences) onOpenPreferences = callbacks.onOpenPreferences
   if (callbacks.onCheckUpdates) onCheckUpdates = callbacks.onCheckUpdates
 }
 
-/**
- * Destroy the tray icon.
- */
 export function destroyTray(): void {
   if (tray) {
     tray.destroy()

@@ -271,7 +271,9 @@ export interface ServerConfig {
   name: string;
   url: string;
   lastUsed: number;
-  isLocal?: boolean;  // True for the built-in local Hector server
+  isLocal?: boolean;      // True for workspace-based local server
+  workspacePath?: string; // Absolute path to workspace directory (only for local)
+  port?: number;          // Port for local server (auto-assigned)
   auth?: {
     enabled: boolean;
     type: string;
@@ -284,9 +286,13 @@ export interface ServerConfig {
 // Server Status for UI state machine
 export type ServerStatus = 
   | 'added'           // Just added, discovering...
+  | 'checking'        // Starting/connecting...
   | 'auth_required'   // Needs login
   | 'authenticated'   // Ready to use
   | 'disconnected'    // Connection lost
+  | 'error'           // Error state
+  | 'stopping'        // Stopping process
+  | 'stopped'         // Gracefully stopped
   | 'unreachable';    // Server unavailable
 
 // Per-server UI state (renderer-side)

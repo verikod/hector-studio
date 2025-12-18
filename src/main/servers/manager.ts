@@ -1,21 +1,23 @@
 import Store from 'electron-store'
 import { v4 as uuidv4 } from 'uuid'
 
-// Fixed ID for the local server - always the same so it can be found
-export const LOCAL_SERVER_ID = 'local-hector'
+// Base port for local workspaces - each workspace gets next available
+const BASE_PORT = 8080
 
 export interface ServerConfig {
   id: string
   name: string
   url: string
   lastUsed: number
-  isLocal?: boolean  // True for the built-in local Hector server
+  isLocal?: boolean       // True for workspace-based local server
+  workspacePath?: string  // Absolute path to workspace directory (only for local)
+  port?: number           // Port for local server (auto-assigned)
   auth?: {
     enabled: boolean
     type: string
     issuer: string
     audience: string
-    clientId?: string // User-provided client ID
+    clientId?: string
   }
 }
 
@@ -33,10 +35,74 @@ const store = new Store<ServerStore>({
 })
 
 export class ServerManager {
+  constructor() {
+    this.cleanupInvalidServers()
+  }
+
+  /**
+   * Remove invalid local servers (missing workspacePath or port)
+   * This handles migration from legacy single-server model.
+   */
+  private cleanupInvalidServers() {
+    const servers = store.get('servers')
+    const validServers = servers.filter(s => {
+      // Keep remote servers
+      if (!s.isLocal) return true
+      
+      // Keep valid local workspaces
+      if (s.workspacePath && s.port) return true
+      
+      console.log(`[ServerManager] Removing invalid local server: ${s.name} (${s.id})`)
+      return false
+    })
+    
+    if (validServers.length !== servers.length) {
+      store.set('servers', validServers)
+      
+      // Reset active ID if removed
+      const activeId = store.get('activeServerId')
+      if (activeId && !validServers.find(s => s.id === activeId)) {
+        store.set('activeServerId', null)
+      }
+    }
+  }
+
   getServers(): ServerConfig[] {
     return store.get('servers')
   }
+  
+  /**
+   * Get all workspace (local) servers.
+   */
+  getWorkspaces(): ServerConfig[] {
+    return this.getServers().filter(s => s.isLocal)
+  }
+  
+  /**
+   * Get all remote servers.
+   */
+  getRemoteServers(): ServerConfig[] {
+    return this.getServers().filter(s => !s.isLocal)
+  }
+  
+  /**
+   * Get the next available port for a new workspace.
+   */
+  getNextAvailablePort(): number {
+    const usedPorts = this.getWorkspaces()
+      .map(s => s.port)
+      .filter((p): p is number => p !== undefined)
+    
+    let port = BASE_PORT
+    while (usedPorts.includes(port)) {
+      port++
+    }
+    return port
+  }
 
+  /**
+   * Add a remote server by URL.
+   */
   addServer(name: string, url: string): ServerConfig {
     const servers = this.getServers()
     // Check if URL already exists
@@ -61,19 +127,45 @@ export class ServerManager {
 
     return newServer
   }
+  
+  /**
+   * Add a workspace (local server).
+   * Auto-assigns a port and creates URL.
+   */
+  addWorkspace(name: string, workspacePath: string): ServerConfig {
+    const servers = this.getServers()
+    
+    // Check if workspace path already exists
+    const existing = servers.find(s => s.workspacePath === workspacePath)
+    if (existing) {
+      throw new Error(`Workspace at ${workspacePath} already exists`)
+    }
+    
+    const port = this.getNextAvailablePort()
+    const url = `http://localhost:${port}`
+    
+    const newWorkspace: ServerConfig = {
+      id: uuidv4(),
+      name,
+      url,
+      workspacePath,
+      port,
+      isLocal: true,
+      lastUsed: Date.now()
+    }
+    
+    // Add workspaces at the beginning
+    store.set('servers', [newWorkspace, ...servers])
+    
+    return newWorkspace
+  }
 
   removeServer(id: string): void {
     const servers = this.getServers()
-    // Prevent removing the local server
-    const server = servers.find(s => s.id === id)
-    if (server?.isLocal) {
-      throw new Error('Cannot remove the local Hector server')
-    }
-    
     const newServers = servers.filter(s => s.id !== id)
     store.set('servers', newServers)
 
-    // Using "activeServerId" logic
+    // Clear active if removed
     if (store.get('activeServerId') === id) {
       store.set('activeServerId', newServers.length > 0 ? newServers[0].id : null)
     }
@@ -92,13 +184,21 @@ export class ServerManager {
     return updated
   }
 
+  getServer(id: string): ServerConfig | null {
+    return this.getServers().find(s => s.id === id) || null
+  }
+
   getActiveServer(): ServerConfig | null {
     const id = store.get('activeServerId')
     if (!id) return null
     return this.getServers().find(s => s.id === id) || null
   }
 
-  setActiveServer(id: string): void {
+  setActiveServer(id: string | null): void {
+    if (id === null) {
+      store.set('activeServerId', null)
+      return
+    }
     const servers = this.getServers()
     if (!servers.find(s => s.id === id)) {
       throw new Error('Server not found')
@@ -109,45 +209,12 @@ export class ServerManager {
   }
   
   /**
-   * Register or update the local Hector server.
-   * Called when local Hector starts.
+   * Get the active workspace (local server) if any.
    */
-  registerLocalServer(url: string): ServerConfig {
-    const servers = this.getServers()
-    const existing = servers.find(s => s.id === LOCAL_SERVER_ID)
-    
-    if (existing) {
-      // Update URL if changed
-      return this.updateServer(LOCAL_SERVER_ID, { url, lastUsed: Date.now() })
-    }
-    
-    // Create new local server entry
-    const localServer: ServerConfig = {
-      id: LOCAL_SERVER_ID,
-      name: 'Local (Built-in)',
-      url,
-      lastUsed: Date.now(),
-      isLocal: true
-    }
-    
-    // Add at the beginning so it appears first
-    store.set('servers', [localServer, ...servers])
-    
-    // Set as active if no other server is active
-    if (!store.get('activeServerId')) {
-      store.set('activeServerId', LOCAL_SERVER_ID)
-    }
-    
-    return localServer
-  }
-  
-  /**
-   * Get the local Hector server if registered.
-   */
-  getLocalServer(): ServerConfig | null {
-    return this.getServers().find(s => s.id === LOCAL_SERVER_ID) || null
+  getActiveWorkspace(): ServerConfig | null {
+    const active = this.getActiveServer()
+    return active?.isLocal ? active : null
   }
 }
 
 export const serverManager = new ServerManager()
-

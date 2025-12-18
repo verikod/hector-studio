@@ -1,16 +1,14 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import { serverManager } from './servers/manager'
 import { authManager } from './auth/manager'
 import {
   isHectorInstalled,
   getInstalledVersion,
   downloadHector,
-  startHector,
-  stopHector,
+  stopWorkspace,
+  switchWorkspace,
   getHectorStatus,
-  getHectorUrl,
-  getWorkspaceDir,
-  setWorkspaceDir,
+  getActiveWorkspaceId,
   checkForUpdates
 } from './hector/manager'
 
@@ -29,18 +27,54 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('server:get-active', () => serverManager.getActiveServer())
 
   ipcMain.handle('server:set-active', async (_, id) => {
-    serverManager.setActiveServer(id)
+    const server = serverManager.getServer(id)
+    if (server?.isLocal) {
+      // For workspaces, switch starts the workspace process
+      await switchWorkspace(id)
+    } else {
+      serverManager.setActiveServer(id)
+    }
   })
 
   ipcMain.handle('server:discover-auth', async (_, url) => {
     return authManager.discoverAuth(url)
   })
 
+  // Workspace Management
+  ipcMain.handle('workspace:browse', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Workspace Folder',
+      properties: ['openDirectory', 'createDirectory'],
+      buttonLabel: 'Select Workspace'
+    })
+    
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    
+    return result.filePaths[0]
+  })
+  
+  ipcMain.handle('workspace:add', async (_, { name, path }) => {
+    return serverManager.addWorkspace(name, path)
+  })
+  
+  ipcMain.handle('workspace:switch', async (_, id) => {
+    return switchWorkspace(id)
+  })
+  
+  ipcMain.handle('workspace:stop', async () => {
+    return stopWorkspace()
+  })
+  
+  ipcMain.handle('workspace:get-active', () => {
+    return getActiveWorkspaceId()
+  })
+
   // Auth Management
   ipcMain.handle('auth:login', async (_, url) => {
     const servers = serverManager.getServers()
     const server = servers.find(s => s.url === url)
-    // Default to 'hector-studio' if no client ID configured
     const clientId = server?.auth?.clientId || 'hector-studio'
     return authManager.login(url, clientId)
   })
@@ -57,7 +91,7 @@ export function registerIPCHandlers(): void {
     return authManager.isAuthenticated(url)
   })
 
-  // Local Hector Management
+  // Hector Binary Management
   ipcMain.handle('hector:is-installed', () => isHectorInstalled())
   
   ipcMain.handle('hector:get-version', () => getInstalledVersion())
@@ -66,23 +100,7 @@ export function registerIPCHandlers(): void {
     return downloadHector(version)
   })
   
-  ipcMain.handle('hector:start', async (_, port?: number) => {
-    return startHector(port)
-  })
-  
-  ipcMain.handle('hector:stop', async () => {
-    return stopHector()
-  })
-  
   ipcMain.handle('hector:get-status', () => getHectorStatus())
-  
-  ipcMain.handle('hector:get-url', () => getHectorUrl())
-  
-  ipcMain.handle('hector:get-workspace', () => getWorkspaceDir())
-  
-  ipcMain.handle('hector:set-workspace', async (_, dir: string) => {
-    return setWorkspaceDir(dir)
-  })
   
   ipcMain.handle('hector:check-updates', async () => {
     return checkForUpdates()

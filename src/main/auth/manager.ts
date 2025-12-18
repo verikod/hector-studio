@@ -32,7 +32,11 @@ export class AuthManager extends EventEmitter {
         }
       }
       return null
-    } catch (error) {
+    } catch (error: any) {
+      // Suppress connection refused errors during startup/polling
+      if (error.message && (error.message.includes('ERR_CONNECTION_REFUSED') || error.code === 'ECONNREFUSED')) {
+        return null
+      }
       console.error('Failed to discover auth:', error)
       return null
     }

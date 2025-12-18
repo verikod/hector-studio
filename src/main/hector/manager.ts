@@ -5,7 +5,7 @@
  * - Check if installed
  * - Download from GitHub releases
  * - Version checking
- * - Spawning/killing the process
+ * - Spawning/killing the process (one workspace at a time)
  */
 
 import { app, BrowserWindow } from 'electron'
@@ -16,34 +16,18 @@ import { readFile, writeFile } from 'fs/promises'
 import { get as httpsGet } from 'https'
 import { pipeline } from 'stream/promises'
 import { setTrayState } from '../tray'
-import { serverManager, LOCAL_SERVER_ID } from '../servers/manager'
-
-/**
- * Emit status change event for local server to all renderer windows.
- * Provides instant UI feedback instead of waiting for polling.
- */
-function emitLocalServerStatus(status: 'starting' | 'running' | 'stopping' | 'stopped' | 'error', error?: string): void {
-  const statusEvent = {
-    id: LOCAL_SERVER_ID,
-    status: status === 'running' ? 'authenticated' : status === 'error' ? 'error' : 'checking',
-    error
-  }
-  BrowserWindow.getAllWindows().forEach(win => {
-    win.webContents.send('server:status-change', statusEvent)
-  })
-}
+import { serverManager, ServerConfig } from '../servers/manager'
 
 // Hector compatibility - should match Studio release
 const HECTOR_COMPATIBILITY = {
   minVersion: '0.9.1',
   recommendedVersion: '0.9.1',
-  // Note: releases are under verikod/hector organization
   downloadBaseUrl: 'https://github.com/verikod/hector/releases/download'
 }
 
-// State
+// State for the single active workspace
 let hectorProcess: ChildProcess | null = null
-let currentPort: number = 8080
+let activeWorkspaceId: string | null = null
 
 type HectorStatus = 'not_installed' | 'stopped' | 'starting' | 'running' | 'error'
 let currentStatus: HectorStatus = 'not_installed'
@@ -51,6 +35,38 @@ let currentStatus: HectorStatus = 'not_installed'
 // Event callbacks
 let onStatusChange: ((status: HectorStatus, error?: string) => void) | null = null
 let onLog: ((line: string, isError: boolean) => void) | null = null
+
+/**
+ * Emit status change event for a workspace to all renderer windows.
+ */
+function emitWorkspaceStatus(workspaceId: string, status: 'starting' | 'running' | 'stopping' | 'stopped' | 'error', error?: string): void {
+  const statusEvent = {
+    id: workspaceId,
+    status: status === 'running' ? 'authenticated' 
+      : status === 'error' ? 'error' 
+      : status === 'stopped' ? 'stopped'
+      : status === 'stopping' ? 'stopping'
+      : 'checking',
+    error
+  }
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.webContents.send('server:status-change', statusEvent)
+  })
+}
+
+/**
+ * Notify renderers that server list has changed.
+ */
+function emitServersUpdated(): void {
+  const servers = serverManager.getServers()
+  BrowserWindow.getAllWindows().forEach(win => {
+    win.webContents.send('servers:updated', servers)
+  })
+}
+
+// ============================================================================
+// Binary Management
+// ============================================================================
 
 /**
  * Get the Hector binary directory.
@@ -68,13 +84,10 @@ function getHectorDir(): string {
  * In development, can be overridden with DEV_HECTOR_PATH environment variable.
  */
 function getHectorBinaryPath(): string {
-  // Dev mode: use local hector binary if specified
   const devPath = process.env.DEV_HECTOR_PATH
-  console.log(`[hector] DEV_HECTOR_PATH=${devPath || '(not set)'}`)
   if (devPath) {
-    const devExists = existsSync(devPath)
-    console.log(`[hector] Dev path exists: ${devExists}`)
-    if (devExists) {
+    console.log(`[hector] DEV_HECTOR_PATH=${devPath}`)
+    if (existsSync(devPath)) {
       console.log(`[hector] Using dev binary: ${devPath}`)
       return devPath
     }
@@ -84,91 +97,103 @@ function getHectorBinaryPath(): string {
   return join(getHectorDir(), `hector${ext}`)
 }
 
-/**
- * Get the version file path.
- */
 function getVersionFilePath(): string {
   return join(getHectorDir(), 'version.txt')
 }
 
-/**
- * Check if Hector is installed.
- */
 export function isHectorInstalled(): boolean {
   return existsSync(getHectorBinaryPath())
 }
 
-/**
- * Get the installed Hector version.
- */
 export async function getInstalledVersion(): Promise<string | null> {
   const versionFile = getVersionFilePath()
-  if (!existsSync(versionFile)) {
-    return null
-  }
+  if (!existsSync(versionFile)) return null
   try {
-    const version = await readFile(versionFile, 'utf-8')
-    return version.trim()
+    return (await readFile(versionFile, 'utf-8')).trim()
   } catch {
     return null
   }
 }
 
-/**
- * Get the download URL for the current platform.
- * Releases are packaged as:
- * - hector_{version}_{platform}_{arch}.tar.gz (macOS, Linux)
- * - hector_{version}_{platform}_{arch}.zip (Windows)
- */
+// ============================================================================
+// Download Management
+// ============================================================================
+
 function getDownloadUrl(version: string): string {
-  const platform = process.platform === 'darwin' ? 'darwin'
-    : process.platform === 'win32' ? 'windows'
-    : 'linux'
+  const platform = process.platform
+  const arch = process.arch
   
-  const arch = process.arch === 'arm64' ? 'arm64' : 'amd64'
-  const ext = process.platform === 'win32' ? 'zip' : 'tar.gz'
+  let osName: string
+  let archName: string
+  let ext: string
   
-  // Format: hector_0.9.1_darwin_arm64.tar.gz
-  return `${HECTOR_COMPATIBILITY.downloadBaseUrl}/v${version}/hector_${version}_${platform}_${arch}.${ext}`
+  switch (platform) {
+    case 'darwin':
+      osName = 'darwin'
+      ext = 'tar.gz'
+      break
+    case 'linux':
+      osName = 'linux'
+      ext = 'tar.gz'
+      break
+    case 'win32':
+      osName = 'windows'
+      ext = 'zip'
+      break
+    default:
+      throw new Error(`Unsupported platform: ${platform}`)
+  }
+  
+  switch (arch) {
+    case 'x64':
+      archName = 'amd64'
+      break
+    case 'arm64':
+      archName = 'arm64'
+      break
+    default:
+      throw new Error(`Unsupported architecture: ${arch}`)
+  }
+  
+  const filename = `hector_${version}_${osName}_${archName}.${ext}`
+  return `${HECTOR_COMPATIBILITY.downloadBaseUrl}/v${version}/${filename}`
 }
 
-/**
- * Download Hector binary from GitHub releases.
- * Downloads the archive and extracts the binary.
- */
 export async function downloadHector(
   version: string = HECTOR_COMPATIBILITY.recommendedVersion,
   onProgress?: (percent: number) => void
 ): Promise<void> {
   const url = getDownloadUrl(version)
+  console.log(`[hector] Downloading from: ${url}`)
+  
   const hectorDir = getHectorDir()
   const isZip = url.endsWith('.zip')
   const archivePath = join(hectorDir, isZip ? 'hector.zip' : 'hector.tar.gz')
+  const binaryPath = getHectorBinaryPath()
   
-  console.log(`[hector] Downloading from ${url}`)
-  
-  // Download the archive
   await new Promise<void>((resolve, reject) => {
-    const handleRedirect = (downloadUrl: string): void => {
-      httpsGet(downloadUrl, (response) => {
-        // Handle redirects
-        if (response.statusCode === 301 || response.statusCode === 302) {
+    const getWithRedirects = (currentUrl: string, redirectCount = 0) => {
+      if (redirectCount > 5) {
+        reject(new Error('Too many redirects'))
+        return
+      }
+      
+      httpsGet(currentUrl, (response) => {
+        if (response.statusCode === 302 || response.statusCode === 301) {
           const redirectUrl = response.headers.location
           if (redirectUrl) {
-            handleRedirect(redirectUrl)
+            getWithRedirects(redirectUrl, redirectCount + 1)
             return
           }
         }
         
         if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download: HTTP ${response.statusCode} from ${downloadUrl}`))
+          reject(new Error(`Download failed: ${response.statusCode}`))
           return
         }
         
         const totalSize = parseInt(response.headers['content-length'] || '0', 10)
         let downloadedSize = 0
-        
-        const fileStream = createWriteStream(archivePath)
         
         response.on('data', (chunk: Buffer) => {
           downloadedSize += chunk.length
@@ -177,105 +202,72 @@ export async function downloadHector(
           }
         })
         
+        const fileStream = createWriteStream(archivePath)
         pipeline(response, fileStream)
           .then(() => resolve())
-          .catch((err) => {
-            try {
-              if (existsSync(archivePath)) {
-                unlinkSync(archivePath)
-              }
-            } catch {}
-            reject(err)
-          })
+          .catch(reject)
       }).on('error', reject)
     }
     
-    handleRedirect(url)
+    getWithRedirects(url)
   })
   
-  console.log(`[hector] Downloaded archive, extracting...`)
+  console.log(`[hector] Downloaded archive to: ${archivePath}`)
   
-  // Extract the binary
-  const binaryPath = getHectorBinaryPath()
-  
-  try {
-    if (isZip) {
-      // Extract zip (Windows)
-      const AdmZip = require('adm-zip')
-      const zip = new AdmZip(archivePath)
-      zip.extractAllTo(hectorDir, true)
-    } else {
-      // Extract tar.gz (macOS, Linux)
-      const tar = require('tar')
-      await tar.extract({
-        file: archivePath,
-        cwd: hectorDir,
-      })
-    }
-    
-    // Make executable on Unix
-    if (process.platform !== 'win32' && existsSync(binaryPath)) {
-      chmodSync(binaryPath, 0o755)
-    }
-    
-    // Clean up archive
-    if (existsSync(archivePath)) {
-      unlinkSync(archivePath)
-    }
-    
-    // Save version
-    await writeFile(getVersionFilePath(), version)
-    
-    console.log(`[hector] Downloaded and extracted v${version} successfully`)
-    setStatus('stopped')
-    
-  } catch (err) {
-    // Clean up on error
-    try {
-      if (existsSync(archivePath)) {
-        unlinkSync(archivePath)
-      }
-    } catch {}
-    throw err
+  // Extract
+  if (isZip) {
+    const AdmZip = require('adm-zip')
+    const zip = new AdmZip(archivePath)
+    zip.extractAllTo(hectorDir, true)
+  } else {
+    const tar = require('tar')
+    await tar.x({
+      file: archivePath,
+      cwd: hectorDir,
+      strip: 0
+    })
   }
+  
+  // Make executable on Unix
+  if (process.platform !== 'win32') {
+    chmodSync(binaryPath, 0o755)
+  }
+  
+  // Clean up and save version
+  unlinkSync(archivePath)
+  await writeFile(getVersionFilePath(), version)
+  
+  console.log(`[hector] Installed version ${version}`)
+}
+
+// ============================================================================
+// Process Management (One Workspace at a Time)
+// ============================================================================
+
+/**
+ * Get the currently active workspace ID.
+ */
+export function getActiveWorkspaceId(): string | null {
+  return activeWorkspaceId
 }
 
 /**
- * Get the workspace directory.
+ * Start Hector for a specific workspace.
+ * Stops any currently running workspace first.
  */
-export function getWorkspaceDir(): string {
-  const workspaceConfig = join(app.getPath('userData'), 'workspace.txt')
-  if (existsSync(workspaceConfig)) {
-    try {
-      const workspace = require('fs').readFileSync(workspaceConfig, 'utf-8').trim()
-      if (workspace && existsSync(workspace)) {
-        return workspace
-      }
-    } catch {}
+export async function startWorkspace(workspace: ServerConfig): Promise<void> {
+  if (!workspace.isLocal || !workspace.workspacePath || !workspace.port) {
+    throw new Error('Invalid workspace configuration')
   }
   
-  // Default workspace
-  const defaultWorkspace = join(app.getPath('home'), 'hector-workspace')
-  if (!existsSync(defaultWorkspace)) {
-    mkdirSync(defaultWorkspace, { recursive: true })
+  // Stop current workspace if different
+  if (hectorProcess && activeWorkspaceId !== workspace.id) {
+    console.log(`[hector] Switching from workspace ${activeWorkspaceId} to ${workspace.id}`)
+    await stopWorkspace()
   }
-  return defaultWorkspace
-}
-
-/**
- * Set the workspace directory.
- */
-export async function setWorkspaceDir(dir: string): Promise<void> {
-  const workspaceConfig = join(app.getPath('userData'), 'workspace.txt')
-  await writeFile(workspaceConfig, dir)
-}
-
-/**
- * Start the local Hector server.
- */
-export async function startHector(port: number = 8080): Promise<void> {
+  
   if (hectorProcess) {
-    console.log('[hector] Already running')
+    console.log('[hector] Already running this workspace')
     return
   }
   
@@ -284,30 +276,28 @@ export async function startHector(port: number = 8080): Promise<void> {
   }
   
   const binaryPath = getHectorBinaryPath()
-  const workspaceDir = getWorkspaceDir()
+  const { workspacePath, port, id } = workspace
   
-  console.log(`[hector] Starting on port ${port} with workspace ${workspaceDir}`)
+  // Ensure workspace directory exists
+  if (!existsSync(workspacePath)) {
+    mkdirSync(workspacePath, { recursive: true })
+  }
+  
+  console.log(`[hector] Starting workspace ${id} on port ${port}: ${workspacePath}`)
   setStatus('starting')
-  emitLocalServerStatus('starting')  // Instant UI feedback
+  activeWorkspaceId = id
+  emitWorkspaceStatus(id, 'starting')
   
-  // Find free port if default is taken
-  currentPort = port
+  const configPath = join(workspacePath, 'agents.yaml')
   
-  // Config path - hector will auto-create from StudioConfigTemplate() if it doesn't exist
-  const configPath = join(workspaceDir, 'agents.yaml')
-  
-  // Start hector with config file and studio mode enabled
   hectorProcess = spawn(binaryPath, [
     'serve',
     '--port', String(port),
     '--studio',
     '--config', configPath
   ], {
-    cwd: workspaceDir,  // Set working directory for file tools
-    env: {
-      ...process.env,
-      // Add any additional env vars here
-    },
+    cwd: workspacePath,
+    env: { ...process.env },
     detached: false,
   })
   
@@ -316,7 +306,6 @@ export async function startHector(port: number = 8080): Promise<void> {
     console.log(`[hector] ${line}`)
     onLog?.(line, false)
     
-    // Detect when server is ready
     if (line.includes('Listening on') || line.includes('Server started')) {
       setStatus('running')
     }
@@ -330,74 +319,72 @@ export async function startHector(port: number = 8080): Promise<void> {
   
   hectorProcess.on('close', (code) => {
     console.log(`[hector] Process exited with code ${code}`)
+    const wasId = activeWorkspaceId
     hectorProcess = null
+    activeWorkspaceId = null
     
     if (currentStatus === 'running' || currentStatus === 'starting') {
-      // Unexpected exit
       setStatus('error', `Process exited with code ${code}`)
+      if (wasId) emitWorkspaceStatus(wasId, 'error', `Process exited with code ${code}`)
     } else {
       setStatus('stopped')
+      if (wasId) emitWorkspaceStatus(wasId, 'stopped')
     }
   })
   
   hectorProcess.on('error', (err) => {
     console.error('[hector] Failed to start:', err)
     hectorProcess = null
+    activeWorkspaceId = null
     setStatus('error', err.message)
-    emitLocalServerStatus('error', err.message)  // Instant UI feedback
+    emitWorkspaceStatus(id, 'error', err.message)
   })
   
-  // Give it a moment to start
+  // Wait for startup
   await new Promise(resolve => setTimeout(resolve, 1000))
   
-  // Check if it's still running
   if (hectorProcess && !hectorProcess.killed) {
     setStatus('running')
-    emitLocalServerStatus('running')  // Instant UI feedback
-    
-    // Register local server in the servers list
-    const localUrl = getHectorUrl()
-    serverManager.registerLocalServer(localUrl)
-    console.log(`[hector] Registered local server at ${localUrl}`)
-    
-    // Notify all renderer windows that servers list has changed
-    const servers = serverManager.getServers()
-    BrowserWindow.getAllWindows().forEach(win => {
-      win.webContents.send('servers:updated', servers)
-    })
+    emitWorkspaceStatus(id, 'running')
+    // Set as active server
+    serverManager.setActiveServer(id)
+    emitServersUpdated()
   }
 }
 
 /**
- * Stop the local Hector server.
+ * Stop the currently running workspace.
  */
-export async function stopHector(): Promise<void> {
+export async function stopWorkspace(): Promise<void> {
   if (!hectorProcess) {
-    console.log('[hector] Not running')
+    console.log('[hector] No workspace running')
     return
   }
   
-  console.log('[hector] Stopping...')
-  emitLocalServerStatus('stopping')  // Instant UI feedback
+  const workspaceId = activeWorkspaceId
+  console.log(`[hector] Stopping workspace ${workspaceId}...`)
+  
+  if (workspaceId) {
+    emitWorkspaceStatus(workspaceId, 'stopping')
+  }
   
   return new Promise((resolve) => {
     const proc = hectorProcess!
     
-    // Set up exit handler
     proc.once('close', () => {
       hectorProcess = null
+      activeWorkspaceId = null
       setStatus('stopped')
-      emitLocalServerStatus('stopped')  // Instant UI feedback
+      if (workspaceId) {
+        emitWorkspaceStatus(workspaceId, 'stopped')
+      }
       resolve()
     })
     
-    // Try graceful shutdown first
     if (process.platform === 'win32') {
       proc.kill()
     } else {
       proc.kill('SIGTERM')
-      
-      // Force kill after 5 seconds
       setTimeout(() => {
         if (hectorProcess) {
           proc.kill('SIGKILL')
@@ -408,77 +395,63 @@ export async function stopHector(): Promise<void> {
 }
 
 /**
- * Get the current Hector status.
+ * Switch to a different workspace.
+ * Stops current → Starts new.
  */
+export async function switchWorkspace(workspaceId: string): Promise<void> {
+  const workspace = serverManager.getServer(workspaceId)
+  if (!workspace) {
+    throw new Error(`Workspace ${workspaceId} not found`)
+  }
+  if (!workspace.isLocal) {
+    throw new Error('Cannot switch to a remote server')
+  }
+  
+  await startWorkspace(workspace)
+}
+
+// ============================================================================
+// Status & Callbacks
+// ============================================================================
+
 export function getHectorStatus(): HectorStatus {
   return currentStatus
 }
 
-/**
- * Get the current port.
- */
-export function getHectorPort(): number {
-  return currentPort
-}
-
-/**
- * Get the local Hector URL.
- */
-export function getHectorUrl(): string {
-  return `http://localhost:${currentPort}`
-}
-
-/**
- * Register status change callback.
- */
 export function onHectorStatusChange(
   callback: (status: HectorStatus, error?: string) => void
 ): void {
   onStatusChange = callback
 }
 
-/**
- * Register log callback.
- */
 export function onHectorLog(
   callback: (line: string, isError: boolean) => void
 ): void {
   onLog = callback
 }
 
-/**
- * Internal: Update status and notify.
- */
 function setStatus(status: HectorStatus, error?: string): void {
   currentStatus = status
   
-  // Update tray
   const trayState = status === 'running' ? 'running'
     : status === 'starting' ? 'starting'
     : status === 'error' ? 'error'
     : 'stopped'
   setTrayState(trayState)
   
-  // Notify callback
   onStatusChange?.(status, error)
   
-  // Notify renderer
   BrowserWindow.getAllWindows().forEach(win => {
     win.webContents.send('hector-status-change', { status, error })
   })
 }
 
-/**
- * Check for updates to Hector binary.
- */
 export async function checkForUpdates(): Promise<{
   hasUpdate: boolean
   currentVersion: string | null
   latestVersion: string
 }> {
   const current = await getInstalledVersion()
-  // For now, just compare with recommended version
-  // In a full implementation, we'd check GitHub releases API
   const latest = HECTOR_COMPATIBILITY.recommendedVersion
   
   return {
@@ -486,4 +459,18 @@ export async function checkForUpdates(): Promise<{
     currentVersion: current,
     latestVersion: latest
   }
+}
+
+// Legacy compatibility - these now delegate to workspace functions
+export async function startHector(_port: number = 8080): Promise<void> {
+  const active = serverManager.getActiveWorkspace()
+  if (active) {
+    await startWorkspace(active)
+  } else {
+    throw new Error('No workspace selected. Add a workspace first.')
+  }
+}
+
+export async function stopHector(): Promise<void> {
+  await stopWorkspace()
 }

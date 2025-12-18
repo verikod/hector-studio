@@ -28,6 +28,12 @@ export function CoverOverlay({ onLoginClick, onRetryClick }: CoverOverlayProps) 
             subtitle: `Discovering ${activeServer.config.name}`,
             animate: true,
         },
+        checking: {
+            icon: Loader2,
+            title: 'Starting...',
+            subtitle: `Starting workspace ${activeServer.config.name}`,
+            animate: true,
+        },
         auth_required: {
             icon: Lock,
             title: 'Login Required',
@@ -40,11 +46,29 @@ export function CoverOverlay({ onLoginClick, onRetryClick }: CoverOverlayProps) 
             subtitle: activeServer.lastError || 'Attempting to reconnect...',
             action: { label: 'Retry', onClick: onRetryClick },
         },
+        error: {
+            icon: WifiOff,
+            title: 'Connection Failed',
+            subtitle: activeServer.lastError || 'Server encountered an error',
+            action: { label: 'Retry', onClick: onRetryClick },
+        },
         unreachable: {
             icon: WifiOff,
             title: 'Server Unavailable',
             subtitle: activeServer.lastError || 'Cannot reach the server',
             action: { label: 'Retry', onClick: onRetryClick },
+        },
+        stopping: {
+            icon: Loader2,
+            title: 'Stopping...',
+            subtitle: 'Stopping workspace...',
+            animate: true,
+        },
+        stopped: {
+            icon: WifiOff,
+            title: 'Stopped',
+            subtitle: 'The workspace is stopped',
+            action: { label: 'Start', onClick: onRetryClick }, // Retry acts as Start/Connect
         },
     };
 

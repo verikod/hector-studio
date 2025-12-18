@@ -51,7 +51,12 @@ export function useHealthPolling() {
             }
         } catch (error) {
             // Connection lost
-            if (activeServer.status === 'authenticated') {
+            // Check current status from store to ensure we haven't switched/stopped in the meantime
+            const currentServer = useServersStore.getState().getActiveServer();
+            const stillActive = currentServer?.config.id === activeServer.config.id;
+            const stillAuthenticated = currentServer?.status === 'authenticated';
+
+            if (stillActive && stillAuthenticated) {
                 console.log('[health] Connection lost to', activeServer.config.name, error);
                 setServerStatus(
                     activeServer.config.id,

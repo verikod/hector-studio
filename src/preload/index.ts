@@ -12,7 +12,7 @@ const api = {
     setActive: (id: string) => ipcRenderer.invoke('server:set-active', id),
     discoverAuth: (url: string) => ipcRenderer.invoke('server:discover-auth', url),
     
-    // Event subscriptions for status updates
+    // Event subscriptions
     onServersUpdated: (callback: (servers: any[]) => void) => {
       const handler = (_: any, servers: any[]) => callback(servers)
       ipcRenderer.on('servers:updated', handler)
@@ -25,6 +25,15 @@ const api = {
     }
   },
   
+  // Workspace Management (local servers)
+  workspace: {
+    browse: () => ipcRenderer.invoke('workspace:browse'),
+    add: (name: string, path: string) => ipcRenderer.invoke('workspace:add', { name, path }),
+    switch: (id: string) => ipcRenderer.invoke('workspace:switch', id),
+    stop: () => ipcRenderer.invoke('workspace:stop'),
+    getActive: () => ipcRenderer.invoke('workspace:get-active')
+  },
+  
   // Auth Management
   auth: {
     login: (url: string) => ipcRenderer.invoke('auth:login', url),
@@ -32,18 +41,24 @@ const api = {
     getToken: (url: string) => ipcRenderer.invoke('auth:get-token', url),
     isAuthenticated: (url: string) => ipcRenderer.invoke('auth:is-authenticated', url),
     
-    // Event for auth status changes
     onAuthStatusChange: (callback: (data: { url: string, authenticated: boolean }) => void) => {
       const handler = (_: any, data: any) => callback(data)
       ipcRenderer.on('auth:status-change', handler)
       return () => ipcRenderer.removeListener('auth:status-change', handler)
     }
+  },
+  
+  // Hector binary management
+  hector: {
+    isInstalled: () => ipcRenderer.invoke('hector:is-installed'),
+    getVersion: () => ipcRenderer.invoke('hector:get-version'),
+    download: (version?: string) => ipcRenderer.invoke('hector:download', version),
+    getStatus: () => ipcRenderer.invoke('hector:get-status'),
+    checkUpdates: () => ipcRenderer.invoke('hector:check-updates')
   }
 }
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+// Expose to renderer
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
@@ -52,8 +67,8 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore (define in dts)
+  // @ts-ignore
   window.electron = electronAPI
-  // @ts-ignore (define in dts)
+  // @ts-ignore
   window.api = api
 }
