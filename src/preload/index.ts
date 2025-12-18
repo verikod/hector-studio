@@ -32,7 +32,8 @@ const api = {
     switch: (id: string) => ipcRenderer.invoke('workspace:switch', id),
     stop: () => ipcRenderer.invoke('workspace:stop'),
     start: (id: string) => ipcRenderer.invoke('workspace:start', id),
-    getActive: () => ipcRenderer.invoke('workspace:get-active')
+    getActive: () => ipcRenderer.invoke('workspace:get-active'),
+    createDefault: () => ipcRenderer.invoke('workspace:create-default')
   },
   
   // Auth Management

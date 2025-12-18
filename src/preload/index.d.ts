@@ -43,6 +43,7 @@ declare global {
       stop: () => Promise<void>
       start: (id: string) => Promise<void>
       getActive: () => Promise<string | null>
+      createDefault: () => Promise<ServerConfig>
     }
     auth: {
       login: (url: string) => Promise<void>

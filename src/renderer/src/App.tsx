@@ -38,11 +38,8 @@ function App() {
     setAppState('downloading');
     try {
       await window.api.hector.download();
-      // After download, start the default workspace
-      const workspaceId = await window.api.workspace.getActive();
-      if (workspaceId) {
-        await window.api.workspace.start(workspaceId);
-      }
+      // After download, create and start default workspace
+      await window.api.workspace.createDefault();
       setAppState('ready');
     } catch (error) {
       console.error('Download failed:', error);

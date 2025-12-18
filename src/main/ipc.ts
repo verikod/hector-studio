@@ -1,4 +1,6 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, app } from 'electron'
+import { join } from 'path'
+import { mkdirSync } from 'fs'
 import { serverManager } from './servers/manager'
 import { authManager } from './auth/manager'
 import {
@@ -7,6 +9,7 @@ import {
   downloadHector,
   stopWorkspace,
   switchWorkspace,
+  startWorkspace,
   getHectorStatus,
   getActiveWorkspaceId,
   checkForUpdates
@@ -73,6 +76,23 @@ export function registerIPCHandlers(): void {
   
   ipcMain.handle('workspace:get-active', () => {
     return getActiveWorkspaceId()
+  })
+  
+  // Create default workspace after hector download
+  ipcMain.handle('workspace:create-default', async () => {
+    const documentsPath = app.getPath('documents')
+    const defaultPath = join(documentsPath, 'Hector', 'Default')
+    mkdirSync(defaultPath, { recursive: true })
+    
+    console.log('[ipc] Creating default workspace:', defaultPath)
+    const workspace = serverManager.addWorkspace('Default', defaultPath)
+    
+    if (workspace) {
+      console.log('[ipc] Starting default workspace:', workspace.id)
+      await startWorkspace(workspace)
+    }
+    
+    return workspace
   })
 
   // Auth Management

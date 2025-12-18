@@ -49,19 +49,22 @@ function createWindow(): BrowserWindow {
 }
 
 async function initializeApp(): Promise<void> {
-  // Create default workspace if none exist
-  const servers = serverManager.getServers()
-  if (servers.length === 0) {
-    const documentsPath = app.getPath('documents')
-    const defaultPath = join(documentsPath, 'Hector', 'Default')
-    mkdirSync(defaultPath, { recursive: true })
-    
-    console.log('[main] Creating default workspace:', defaultPath)
-    serverManager.addWorkspace('Default', defaultPath)
-  }
-  
-  // Only attempt to start workspace if hector is installed
+  // Only create and start workspaces if hector is installed
+  // This allows remote-only mode without local workspaces
   if (isHectorInstalled()) {
+    const servers = serverManager.getServers()
+    
+    // Create default workspace if none exist
+    if (servers.filter(s => s.isLocal).length === 0) {
+      const documentsPath = app.getPath('documents')
+      const defaultPath = join(documentsPath, 'Hector', 'Default')
+      mkdirSync(defaultPath, { recursive: true })
+      
+      console.log('[main] Creating default workspace:', defaultPath)
+      serverManager.addWorkspace('Default', defaultPath)
+    }
+    
+    // Auto-start active workspace
     const activeWorkspace = serverManager.getActiveWorkspace()
     if (activeWorkspace) {
       console.log(`[main] Auto-starting workspace: ${activeWorkspace.name}`)
@@ -72,7 +75,7 @@ async function initializeApp(): Promise<void> {
       }
     }
   } else {
-    console.log('[main] Hector not installed, skipping workspace auto-start')
+    console.log('[main] Hector not installed, skipping workspace creation')
   }
   
   // Notify renderer that app is ready with status info
