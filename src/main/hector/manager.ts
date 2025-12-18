@@ -8,7 +8,7 @@
  * - Spawning/killing the process (one workspace at a time)
  */
 
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, net } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import { join } from 'path'
 import { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync } from 'fs'
@@ -34,6 +34,43 @@ let currentStatus: HectorStatus = 'not_installed'
 // Event callbacks
 let onStatusChange: ((status: HectorStatus, error?: string) => void) | null = null
 let onLog: ((line: string, isError: boolean) => void) | null = null
+
+// Startup timeout configuration
+const STARTUP_TIMEOUT_MS = 30000 // 30 seconds max wait for hector to start
+const HEALTH_POLL_INTERVAL_MS = 200 // Check health every 200ms
+
+/**
+ * Wait for Hector server to be healthy by polling /health endpoint.
+ * Returns true if healthy within timeout, false otherwise.
+ */
+async function waitForHealthy(url: string, timeoutMs: number = STARTUP_TIMEOUT_MS): Promise<boolean> {
+    const startTime = Date.now()
+    
+    while (Date.now() - startTime < timeoutMs) {
+        // Check if process died while waiting
+        if (!hectorProcess || hectorProcess.killed) {
+            console.log('[hector] Process died while waiting for health check')
+            return false
+        }
+        
+        try {
+            const response = await net.fetch(`${url}/health`, {
+                signal: AbortSignal.timeout(2000) // 2s timeout per request
+            })
+            if (response.ok) {
+                console.log(`[hector] Health check passed after ${Date.now() - startTime}ms`)
+                return true
+            }
+        } catch {
+            // Server not ready yet, continue polling
+        }
+        
+        await new Promise(r => setTimeout(r, HEALTH_POLL_INTERVAL_MS))
+    }
+    
+    console.log(`[hector] Health check timed out after ${timeoutMs}ms`)
+    return false
+}
 
 /**
  * Emit status change event for a workspace to all renderer windows.
@@ -304,10 +341,7 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         const line = data.toString().trim()
         console.log(`[hector] ${line}`)
         onLog?.(line, false)
-
-        if (line.includes('Listening on') || line.includes('Server started')) {
-            setStatus('running')
-        }
+        // Note: Status is now determined by health check polling, not stdout parsing
     })
 
     hectorProcess.stderr?.on('data', (data: Buffer) => {
@@ -339,15 +373,33 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         emitWorkspaceStatus(id, 'error', err.message)
     })
 
-    // Wait for startup
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    if (hectorProcess && !hectorProcess.killed) {
+    // Wait for server to actually respond to health checks.
+    // This is the authoritative source of truth for 'running' status.
+    // Once healthy, we emit 'running' which maps to 'authenticated' in the renderer.
+    // Local workspaces in the renderer wait for this IPC event rather than probing directly.
+    const serverUrl = `http://localhost:${port}`
+    console.log(`[hector] Waiting for health check at ${serverUrl}/health...`)
+    const isHealthy = await waitForHealthy(serverUrl)
+    
+    if (isHealthy && hectorProcess && !hectorProcess.killed) {
         setStatus('running')
         emitWorkspaceStatus(id, 'running')
         // Set as active server
         serverManager.setActiveServer(id)
         emitServersUpdated()
+    } else if (hectorProcess && !hectorProcess.killed) {
+        // Process is running but not responding to health checks - kill it
+        const errorMsg = 'Server failed to respond to health checks within timeout'
+        console.error('[hector]', errorMsg)
+        
+        // Terminate the unresponsive process
+        console.log('[hector] Killing unresponsive process...')
+        hectorProcess.kill('SIGKILL')
+        hectorProcess = null
+        activeWorkspaceId = null
+        
+        setStatus('error', errorMsg)
+        emitWorkspaceStatus(id, 'error', errorMsg)
     }
 }
 

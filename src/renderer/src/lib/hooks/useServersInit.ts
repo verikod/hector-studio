@@ -19,8 +19,21 @@ export function useServersInit() {
 
         // Check auth status for each server
         for (const server of servers) {
+          // LOCAL WORKSPACES: Don't probe the server directly to avoid race conditions.
+          // The main process (manager.ts) polls /health and emits 'server:status-change'
+          // with 'authenticated' status only after the hector process is confirmed healthy.
+          // This prevents the renderer from trying to connect before the server is ready.
+          if (server.isLocal) {
+            setServerStatus(server.id, 'checking');
+            continue;
+          }
+          
+          // For remote servers, probe auth configuration
           const authConfig = await (window as any).api.server.discoverAuth(server.url);
-          if (authConfig?.enabled) {
+          if (authConfig === null) {
+            // Server unreachable - mark as such
+            setServerStatus(server.id, 'unreachable');
+          } else if (authConfig.enabled) {
             const isAuth = await (window as any).api.auth.isAuthenticated(server.url);
             setServerStatus(server.id, isAuth ? 'authenticated' : 'auth_required');
           } else {
