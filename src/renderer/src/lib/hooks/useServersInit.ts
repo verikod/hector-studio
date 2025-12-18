@@ -19,11 +19,11 @@ export function useServersInit() {
 
         // Check auth status for each server
         for (const server of servers) {
-          // For local workspaces, don't probe - wait for main process status events
-          // The main process will emit 'server:status-change' with 'running' -> 'authenticated' 
-          // when the hector process is healthy
+          // LOCAL WORKSPACES: Don't probe the server directly to avoid race conditions.
+          // The main process (manager.ts) polls /health and emits 'server:status-change'
+          // with 'authenticated' status only after the hector process is confirmed healthy.
+          // This prevents the renderer from trying to connect before the server is ready.
           if (server.isLocal) {
-            // Set to 'checking' initially; main process will emit status when ready
             setServerStatus(server.id, 'checking');
             continue;
           }

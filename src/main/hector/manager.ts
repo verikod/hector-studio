@@ -341,10 +341,7 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         const line = data.toString().trim()
         console.log(`[hector] ${line}`)
         onLog?.(line, false)
-
-        if (line.includes('Listening on') || line.includes('Server started')) {
-            setStatus('running')
-        }
+        // Note: Status is now determined by health check polling, not stdout parsing
     })
 
     hectorProcess.stderr?.on('data', (data: Buffer) => {
@@ -376,7 +373,10 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         emitWorkspaceStatus(id, 'error', err.message)
     })
 
-    // Wait for server to actually respond to health checks
+    // Wait for server to actually respond to health checks.
+    // This is the authoritative source of truth for 'running' status.
+    // Once healthy, we emit 'running' which maps to 'authenticated' in the renderer.
+    // Local workspaces in the renderer wait for this IPC event rather than probing directly.
     const serverUrl = `http://localhost:${port}`
     console.log(`[hector] Waiting for health check at ${serverUrl}/health...`)
     const isHealthy = await waitForHealthy(serverUrl)
@@ -388,9 +388,16 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         serverManager.setActiveServer(id)
         emitServersUpdated()
     } else if (hectorProcess && !hectorProcess.killed) {
-        // Process is running but not responding to health checks
+        // Process is running but not responding to health checks - kill it
         const errorMsg = 'Server failed to respond to health checks within timeout'
         console.error('[hector]', errorMsg)
+        
+        // Terminate the unresponsive process
+        console.log('[hector] Killing unresponsive process...')
+        hectorProcess.kill('SIGKILL')
+        hectorProcess = null
+        activeWorkspaceId = null
+        
         setStatus('error', errorMsg)
         emitWorkspaceStatus(id, 'error', errorMsg)
     }
