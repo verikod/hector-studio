@@ -8,7 +8,7 @@ import {
   checkForUpdates
 } from './hector/manager'
 import { serverManager } from './servers/manager'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -120,6 +120,19 @@ app.whenReady().then(async () => {
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+  })
+
+  // Register Cmd+Shift+D (Ctrl+Shift+D on Windows/Linux) to toggle DevTools
+  // Works in both development and production builds for debugging
+  globalShortcut.register('CommandOrControl+Shift+D', () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow()
+    if (focusedWindow) {
+      if (focusedWindow.webContents.isDevToolsOpened()) {
+        focusedWindow.webContents.closeDevTools()
+      } else {
+        focusedWindow.webContents.openDevTools()
+      }
+    }
   })
 
   ipcMain.on('ping', () => console.log('pong'))
