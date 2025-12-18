@@ -16,6 +16,7 @@ import { WelcomeCover } from "./components/WelcomeCover";
 import { EnableWorkspacesModal } from "./components/EnableWorkspacesModal";
 import { UpdateNotification } from "./components/UpdateNotification";
 import { UpdateRuntimeCover } from "./components/UpdateRuntimeCover";
+import { LogDrawer } from "./components/LogDrawer";
 
 // App lifecycle states
 type AppState = 'initializing' | 'needs_download' | 'needs_update' | 'downloading' | 'ready';
@@ -100,6 +101,14 @@ function App() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'vs-light' | 'hc-black'>('hc-black');
+  const [showLogDrawer, setShowLogDrawer] = useState(false);
+
+  // Listen for open-log-drawer events from ServerList/ServerDropdown
+  useEffect(() => {
+    const handleOpenLogDrawer = () => setShowLogDrawer(true);
+    window.addEventListener('open-log-drawer', handleOpenLogDrawer);
+    return () => window.removeEventListener('open-log-drawer', handleOpenLogDrawer);
+  }, []);
 
   // Prevent double initialization on mount
   const initializedRef = useRef(false);
@@ -275,6 +284,8 @@ function App() {
         onClose={() => setShowSettings(false)}
         editorTheme={editorTheme}
         onThemeChange={setEditorTheme}
+        workspacesEnabled={workspacesEnabled}
+        onWorkspacesChange={setWorkspacesEnabled}
       />
       <EnableWorkspacesModal
         isOpen={showEnableWorkspacesModal}
@@ -284,6 +295,10 @@ function App() {
       <UpdateNotification />
       <ErrorDisplay />
       <SuccessDisplay />
+      <LogDrawer
+        isOpen={showLogDrawer}
+        onClose={() => setShowLogDrawer(false)}
+      />
     </div>
   );
 }

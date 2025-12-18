@@ -44,6 +44,7 @@ declare global {
       start: (id: string) => Promise<void>
       getActive: () => Promise<string | null>
       createDefault: () => Promise<ServerConfig>
+      openFolder: (path: string) => Promise<string>
     }
     workspaces: {
       isEnabled: () => Promise<boolean>
@@ -64,6 +65,9 @@ declare global {
       getStatus: () => Promise<string>
       checkUpdates: () => Promise<{ hasUpdate: boolean, currentVersion: string | null, latestVersion: string }>
       upgrade: () => Promise<void>
+      getLogs: () => Promise<{ line: string, isError: boolean, timestamp: number }[]>
+      clearLogs: () => Promise<{ success: boolean }>
+      onLog: (callback: (entry: { line: string, isError: boolean, timestamp: number }) => void) => () => void
     }
     app: {
       onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => void) => () => void

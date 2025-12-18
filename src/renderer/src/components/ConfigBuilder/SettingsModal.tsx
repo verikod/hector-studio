@@ -1,12 +1,15 @@
-import React from "react";
-import { X, Monitor, RefreshCw } from "lucide-react";
+import React, { useState } from "react";
+import { X, Monitor, RefreshCw, FolderOpen } from "lucide-react";
 import { useStore } from "../../store/useStore";
+import { useServersStore } from "../../store/serversStore";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   editorTheme: 'vs-dark' | 'vs-light' | 'hc-black';
   onThemeChange: (theme: 'vs-dark' | 'vs-light' | 'hc-black') => void;
+  workspacesEnabled?: boolean;
+  onWorkspacesChange?: (enabled: boolean) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -14,9 +17,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   editorTheme,
   onThemeChange,
+  workspacesEnabled = false,
+  onWorkspacesChange,
 }) => {
   const streamingEnabled = useStore((state) => state.streamingEnabled);
   const setStreamingEnabled = useStore((state) => state.setStreamingEnabled);
+  const [workspacesLoading, setWorkspacesLoading] = useState(false);
+
+  const servers = useServersStore((s) => s.servers);
+  const activeServerId = useServersStore((s) => s.activeServerId);
+  const selectServer = useServersStore((s) => s.selectServer);
 
   if (!isOpen) return null;
 
@@ -126,6 +136,73 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 Check for Updates
               </button>
             </div>
+
+            {/* Workspaces */}
+            {onWorkspacesChange && (
+              <div className="pt-4 border-t border-white/10">
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <div>
+                    <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
+                      <FolderOpen size={16} className="text-hector-green" />
+                      Local Workspaces
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Run hector locally with managed workspaces
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={workspacesEnabled}
+                      disabled={workspacesLoading}
+                      onChange={async (e) => {
+                        const newValue = e.target.checked;
+                        setWorkspacesLoading(true);
+                        try {
+                          if (newValue) {
+                            // Enable workspaces - backend will start the workspace
+                            await window.api.workspaces.enable();
+
+                            // Select the first local workspace in the UI
+                            const localWorkspace = Object.values(servers).find(s => s.config.isLocal);
+                            if (localWorkspace) {
+                              selectServer(localWorkspace.config.id);
+                              await window.api.server.setActive(localWorkspace.config.id);
+                            }
+                          } else {
+                            // Stop the local workspace
+                            await window.api.workspaces.disable();
+                            await window.api.workspace.stop();
+
+                            // If active server is a local workspace, deselect it
+                            const activeServer = activeServerId ? servers[activeServerId] : null;
+                            if (activeServer?.config.isLocal) {
+                              // Find a remote server to select instead
+                              const remoteServer = Object.values(servers).find(s => !s.config.isLocal);
+                              if (remoteServer) {
+                                selectServer(remoteServer.config.id);
+                                await window.api.server.setActive(remoteServer.config.id);
+                              } else {
+                                // No remote servers, clear selection
+                                selectServer('');
+                              }
+                            }
+                          }
+                          onWorkspacesChange(newValue);
+                        } catch (error) {
+                          console.error('Failed to toggle workspaces:', error);
+                        } finally {
+                          setWorkspacesLoading(false);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className={`w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all ${workspacesLoading ? 'opacity-50' : ''}`}></div>
+                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

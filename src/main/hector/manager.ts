@@ -35,6 +35,46 @@ let currentStatus: HectorStatus = 'not_installed'
 let onStatusChange: ((status: HectorStatus, error?: string) => void) | null = null
 let onLog: ((line: string, isError: boolean) => void) | null = null
 
+// Log buffer for UI access
+interface LogEntry {
+    line: string
+    isError: boolean
+    timestamp: number
+}
+const MAX_LOG_LINES = 500
+let logBuffer: LogEntry[] = []
+
+/**
+ * Add a log entry to the buffer and emit to all renderer windows.
+ */
+function addLogEntry(line: string, isError: boolean): void {
+    const entry: LogEntry = { line, isError, timestamp: Date.now() }
+    logBuffer.push(entry)
+    if (logBuffer.length > MAX_LOG_LINES) {
+        logBuffer.shift()
+    }
+    // Emit to all renderer windows
+    BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('hector:log', entry)
+    })
+    // Also call the legacy callback if set
+    onLog?.(line, isError)
+}
+
+/**
+ * Get all log entries in the buffer.
+ */
+export function getLogs(): LogEntry[] {
+    return [...logBuffer]
+}
+
+/**
+ * Clear the log buffer.
+ */
+export function clearLogs(): void {
+    logBuffer = []
+}
+
 // Startup timeout configuration
 const STARTUP_TIMEOUT_MS = 30000 // 30 seconds max wait for hector to start
 const HEALTH_POLL_INTERVAL_MS = 200 // Check health every 200ms
@@ -340,14 +380,13 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
     hectorProcess.stdout?.on('data', (data: Buffer) => {
         const line = data.toString().trim()
         console.log(`[hector] ${line}`)
-        onLog?.(line, false)
-        // Note: Status is now determined by health check polling, not stdout parsing
+        addLogEntry(line, false)
     })
 
     hectorProcess.stderr?.on('data', (data: Buffer) => {
         const line = data.toString().trim()
         console.error(`[hector] ${line}`)
-        onLog?.(line, true)
+        addLogEntry(line, true)
     })
 
     hectorProcess.on('close', (code) => {

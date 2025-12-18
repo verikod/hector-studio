@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app } from 'electron'
+import { ipcMain, dialog, app, shell } from 'electron'
 import { join } from 'path'
 import { mkdirSync } from 'fs'
 import { serverManager } from './servers/manager'
@@ -13,7 +13,9 @@ import {
   getHectorStatus,
   getActiveWorkspaceId,
   checkForUpdates,
-  upgradeHector
+  upgradeHector,
+  getLogs,
+  clearLogs
 } from './hector/manager'
 
 export function registerIPCHandlers(): void {
@@ -110,11 +112,12 @@ export function registerIPCHandlers(): void {
       await downloadHector()
     }
 
-    // Create default workspace if no workspaces exist
+    // Get existing workspaces
     const servers = serverManager.getServers()
     const localWorkspaces = servers.filter(s => s.isLocal)
 
     if (localWorkspaces.length === 0) {
+      // Create default workspace if no workspaces exist
       const documentsPath = app.getPath('documents')
       const defaultPath = join(documentsPath, 'Hector', 'Default')
       mkdirSync(defaultPath, { recursive: true })
@@ -126,6 +129,11 @@ export function registerIPCHandlers(): void {
         console.log('[ipc] Starting default workspace:', workspace.id)
         await startWorkspace(workspace)
       }
+    } else {
+      // Re-enabling: start the first existing workspace
+      const firstWorkspace = localWorkspaces[0]
+      console.log('[ipc] Re-enabling workspaces, starting:', firstWorkspace.id)
+      await startWorkspace(firstWorkspace)
     }
 
     // Enable workspaces feature
@@ -178,5 +186,17 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('hector:upgrade', async () => {
     return upgradeHector()
+  })
+
+  ipcMain.handle('hector:get-logs', () => getLogs())
+
+  ipcMain.handle('hector:clear-logs', () => {
+    clearLogs()
+    return { success: true }
+  })
+
+  // Workspace folder operations
+  ipcMain.handle('workspace:open-folder', async (_, path: string) => {
+    return shell.openPath(path)
   })
 }

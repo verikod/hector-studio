@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen } from 'lucide-react';
+import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen, Terminal, ExternalLink } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
@@ -217,34 +217,70 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, workspacesEnab
                                 </div>
 
                                 <div className="flex items-center gap-1">
-                                    {server.status === 'auth_required' && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6 hover:bg-gray-700"
-                                            onClick={(e) => { e.stopPropagation(); onLoginRequest(server.config.id); }}
-                                        >
-                                            <LogIn size={12} />
-                                        </Button>
+                                    {/* Local workspaces: Show Logs and Open Folder */}
+                                    {server.config.isLocal && (
+                                        <>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 hover:bg-gray-700"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    window.dispatchEvent(new CustomEvent('open-log-drawer'));
+                                                }}
+                                                title="Show Logs"
+                                            >
+                                                <Terminal size={12} />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 hover:bg-gray-700"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (server.config.workspacePath) {
+                                                        window.api.workspace.openFolder(server.config.workspacePath);
+                                                    }
+                                                }}
+                                                title="Open Folder"
+                                            >
+                                                <ExternalLink size={12} />
+                                            </Button>
+                                        </>
                                     )}
-                                    {server.status === 'authenticated' && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6 hover:bg-gray-700"
-                                            onClick={(e) => { e.stopPropagation(); onLogoutRequest(server.config.id); }}
-                                        >
-                                            <LogOut size={12} />
-                                        </Button>
+                                    {/* Remote servers: Login/Logout and Delete */}
+                                    {!server.config.isLocal && (
+                                        <>
+                                            {server.status === 'auth_required' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 hover:bg-gray-700"
+                                                    onClick={(e) => { e.stopPropagation(); onLoginRequest(server.config.id); }}
+                                                >
+                                                    <LogIn size={12} />
+                                                </Button>
+                                            )}
+                                            {server.status === 'authenticated' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 hover:bg-gray-700"
+                                                    onClick={(e) => { e.stopPropagation(); onLogoutRequest(server.config.id); }}
+                                                >
+                                                    <LogOut size={12} />
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
+                                                onClick={(e) => handleRemoveServer(server.config.id, e)}
+                                            >
+                                                <Trash2 size={12} />
+                                            </Button>
+                                        </>
                                     )}
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
-                                        onClick={(e) => handleRemoveServer(server.config.id, e)}
-                                    >
-                                        <Trash2 size={12} />
-                                    </Button>
                                     {activeServerId === server.config.id && <Check size={14} className="text-green-500 ml-1" />}
                                 </div>
                             </DropdownMenuItem>

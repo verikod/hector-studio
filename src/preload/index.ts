@@ -33,7 +33,8 @@ const api = {
     stop: () => ipcRenderer.invoke('workspace:stop'),
     start: (id: string) => ipcRenderer.invoke('workspace:start', id),
     getActive: () => ipcRenderer.invoke('workspace:get-active'),
-    createDefault: () => ipcRenderer.invoke('workspace:create-default')
+    createDefault: () => ipcRenderer.invoke('workspace:create-default'),
+    openFolder: (path: string) => ipcRenderer.invoke('workspace:open-folder', path)
   },
 
   // Workspaces Feature Toggle
@@ -64,7 +65,14 @@ const api = {
     download: (version?: string) => ipcRenderer.invoke('hector:download', version),
     getStatus: () => ipcRenderer.invoke('hector:get-status'),
     checkUpdates: () => ipcRenderer.invoke('hector:check-updates'),
-    upgrade: () => ipcRenderer.invoke('hector:upgrade')
+    upgrade: () => ipcRenderer.invoke('hector:upgrade'),
+    getLogs: () => ipcRenderer.invoke('hector:get-logs'),
+    clearLogs: () => ipcRenderer.invoke('hector:clear-logs'),
+    onLog: (callback: (entry: { line: string, isError: boolean, timestamp: number }) => void) => {
+      const handler = (_: any, entry: any) => callback(entry)
+      ipcRenderer.on('hector:log', handler)
+      return () => ipcRenderer.removeListener('hector:log', handler)
+    }
   },
 
   // App lifecycle
