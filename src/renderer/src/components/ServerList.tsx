@@ -131,12 +131,8 @@ export const ServerList: React.FC<ServerListProps> = ({ onSelectCallback, onLogi
 
         setActiveServerId(server.id);
 
-        if (server.isLocal) {
-            // Switching workspace
-            await window.api.workspace.switch(server.id);
-        } else {
-            await window.api.server.setActive(server.id);
-        }
+        // Unified switch logic handled by backend
+        await window.api.server.setActive(server.id);
 
         onSelectCallback(server);
     };

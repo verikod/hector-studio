@@ -117,15 +117,12 @@ export class AuthManager extends EventEmitter {
         if (!tokenRes.ok) throw new Error('Failed to exchange code for token')
         const tokens = await tokenRes.json() as any
 
-        // DECODE & LOG ROLE (for verification)
+        // DECODE (optional verification)
         try {
-            const payload = JSON.parse(Buffer.from(tokens.access_token.split('.')[1], 'base64').toString());
-            console.log('--- LOGIN SUCCESS ---');
-            console.log('User:', payload.email || payload.sub);
-            console.log('Role Claim:', payload.role || payload['https://hector.dev/role'] || 'NONE FOUND');
-            console.log('---------------------');
+            // const payload = JSON.parse(Buffer.from(tokens.access_token.split('.')[1], 'base64').toString());
+            // console.log('User logged in:', payload.email || payload.sub);
         } catch (e) {
-            console.error('Failed to decode token for logging', e);
+            // ignore
         }
 
         // 8. Store Token
