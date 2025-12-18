@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown } from 'lucide-react';
+import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -67,8 +67,40 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
         }
     };
 
+    const handleAddWorkspace = async () => {
+        setIsOpen(false);
+        try {
+            const path = await (window as any).api.workspace.browse();
+            if (!path) return; // User cancelled
+
+            const name = path.split(/[\\/]/).pop() || 'Workspace';
+            const workspace = await (window as any).api.workspace.add(name, path);
+
+            if (workspace) {
+                const { addServer, setServerStatus } = useServersStore.getState();
+                addServer(workspace);
+
+                // Switch to new workspace
+                await (window as any).api.workspace.switch(workspace.id);
+                selectServer(workspace.id);
+                setServerStatus(workspace.id, 'checking');
+            }
+        } catch (error) {
+            console.error('Failed to add workspace:', error);
+        }
+    };
+
     const handleRemoveServer = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
+
+        // Prevent deleting the last workspace (protect default)
+        const localWorkspaces = serverList.filter(s => s.config.isLocal);
+        const isLocal = servers[id]?.config.isLocal;
+        if (isLocal && localWorkspaces.length <= 1) {
+            alert('Cannot delete the last workspace. At least one workspace is required.');
+            return;
+        }
+
         try {
             await (window as any).api.server.remove(id);
             removeServer(id);
@@ -223,10 +255,16 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest }: ServerSelect
                         </div>
                     </div>
                 ) : (
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowAddForm(true); }} className="cursor-pointer focus:bg-gray-800 focus:text-white">
-                        <Plus size={14} className="mr-2" />
-                        Add New Server
-                    </DropdownMenuItem>
+                    <>
+                        <DropdownMenuItem onSelect={() => handleAddWorkspace()} className="cursor-pointer focus:bg-gray-800 focus:text-white">
+                            <FolderOpen size={14} className="mr-2" />
+                            Add Workspace
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowAddForm(true); }} className="cursor-pointer focus:bg-gray-800 focus:text-white">
+                            <Plus size={14} className="mr-2" />
+                            Add Remote Server
+                        </DropdownMenuItem>
+                    </>
                 )}
             </DropdownMenuContent>
         </DropdownMenu>
