@@ -13,6 +13,8 @@ import {
 } from "./ui/tooltip";
 import { api } from '../services/api';
 
+import hectorIcon from '../assets/hector.png';
+
 interface UnifiedHeaderProps {
     onLoginRequest: (serverId: string) => void;
     onLogoutRequest: (serverId: string) => void;
@@ -98,8 +100,8 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings,
         <header className="flex-shrink-0 h-14 bg-black/60 border-b border-white/10 flex items-center px-4 justify-between backdrop-blur-md z-50">
             {/* Left Zone: Identity & Context */}
             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 select-none">
-                    <div className="w-4 h-4 rounded-md bg-hector-green shadow-[0_0_10px_rgba(16,185,129,0.5)] rotate-45 transform" />
+                <div className="flex items-center gap-3 select-none">
+                    <img src={hectorIcon} alt="Hector" className="w-6 h-6 object-contain" />
                     <span className="font-bold tracking-widest text-sm text-white">HECTOR</span>
                 </div>
                 <div className="h-6 w-px bg-white/10" />

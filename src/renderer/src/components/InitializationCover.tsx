@@ -1,4 +1,5 @@
 import React from 'react';
+import hectorIcon from '../assets/hector.png';
 
 /**
  * Full-screen cover shown during app initialization.
@@ -9,8 +10,8 @@ export const InitializationCover: React.FC = () => {
         <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50">
             <div className="flex flex-col items-center gap-6">
                 {/* Logo */}
-                <div className="w-20 h-20 rounded-2xl bg-hector-green/20 flex items-center justify-center">
-                    <span className="text-4xl font-bold text-hector-green">H</span>
+                <div className="w-20 h-20 flex items-center justify-center">
+                    <img src={hectorIcon} alt="Hector" className="w-full h-full object-contain" />
                 </div>
 
                 {/* App Name */}

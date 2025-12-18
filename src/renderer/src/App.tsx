@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import hectorIcon from "./assets/hector.png";
 import { StudioMode } from "./components/ConfigBuilder/StudioMode";
 import { SettingsModal } from "./components/ConfigBuilder/SettingsModal";
 import { ErrorDisplay } from "./components/ErrorDisplay";
@@ -246,8 +247,8 @@ function App() {
         ) : !activeServer ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 bg-gray-900/20">
             <div className="text-center">
-              <div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <div className="w-8 h-8 rounded-full bg-hector-green/20" />
+              <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <img src={hectorIcon} alt="Hector" className="w-full h-full object-contain" />
               </div>
               <h2 className="text-lg font-medium text-gray-300 mb-2">Welcome to Hector Studio</h2>
               <p className="text-sm text-gray-400">Add or select a server to begin</p>
