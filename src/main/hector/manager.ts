@@ -20,8 +20,8 @@ import { serverManager, ServerConfig } from '../servers/manager'
 
 // Hector compatibility - should match Studio release
 const HECTOR_COMPATIBILITY = {
-  minVersion: '0.9.1',
-  recommendedVersion: '0.9.1',
+  minVersion: '0.9.3',
+  recommendedVersion: '0.9.3',
   downloadBaseUrl: 'https://github.com/verikod/hector/releases/download'
 }
 

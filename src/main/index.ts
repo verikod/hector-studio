@@ -56,8 +56,8 @@ app.whenReady().then(() => {
   
   app.setAboutPanelOptions({
     applicationName: 'Hector Studio',
-    applicationVersion: '0.1.0',
-    version: '0.1.0',
+    applicationVersion: '0.1.3',
+    version: '0.1.3',
     iconPath: is.dev ? join(app.getAppPath(), 'resources/icon.png') : undefined,
   })
 

@@ -1,15 +1,15 @@
 {
   "name": "hector-studio",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "productName": "Hector Studio",
-  "description": "An Electron application with React and TypeScript",
+  "description": "Hector Studio Desktop Application",
   "main": "./out/main/index.js",
-  "author": "example.com",
+  "author": "Verikod",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/verikod/hector-studio.git"
   },
-  "homepage": "https://electron-vite.org",
+  "homepage": "https://gohector.dev",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
