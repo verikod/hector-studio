@@ -2,7 +2,8 @@ import { registerIPCHandlers } from './ipc'
 import {
   stopWorkspace,
   getHectorStatus,
-  startWorkspace
+  startWorkspace,
+  isHectorInstalled
 } from './hector/manager'
 import { serverManager } from './servers/manager'
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
@@ -56,15 +57,22 @@ async function initializeApp(): Promise<void> {
     mkdirSync(defaultPath, { recursive: true })
     
     console.log('[main] Creating default workspace:', defaultPath)
-    const defaultWorkspace = serverManager.addWorkspace('Default', defaultPath)
-    await startWorkspace(defaultWorkspace)
-  } else {
-    // Auto-start last active workspace
+    serverManager.addWorkspace('Default', defaultPath)
+  }
+  
+  // Only attempt to start workspace if hector is installed
+  if (isHectorInstalled()) {
     const activeWorkspace = serverManager.getActiveWorkspace()
     if (activeWorkspace) {
-      console.log(`[main] Auto-starting last active workspace: ${activeWorkspace.name}`)
-      await startWorkspace(activeWorkspace)
+      console.log(`[main] Auto-starting workspace: ${activeWorkspace.name}`)
+      try {
+        await startWorkspace(activeWorkspace)
+      } catch (err) {
+        console.error('[main] Failed to start workspace:', err)
+      }
     }
+  } else {
+    console.log('[main] Hector not installed, skipping workspace auto-start')
   }
   
   // Notify renderer that app is ready
