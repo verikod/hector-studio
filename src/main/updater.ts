@@ -83,6 +83,11 @@ function setupIpcHandlers(isDev: boolean) {
             console.log('[updater] Mock install-update (dev mode)')
             return
         }
-        autoUpdater.quitAndInstall()
+        // On macOS, there can be a race condition where the app quits before
+        // the installer launches. Adding a small delay and forceRunAfter helps.
+        console.log('[updater] Installing update and restarting...')
+        setTimeout(() => {
+            autoUpdater.quitAndInstall(false, true) // isSilent=false, isForceRunAfter=true
+        }, 100)
     })
 }
