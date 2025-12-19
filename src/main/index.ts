@@ -81,11 +81,9 @@ async function initializeApp(): Promise<void> {
     const activeWorkspace = serverManager.getActiveWorkspace()
     if (activeWorkspace && !needsRuntimeUpdate) {
       console.log(`[main] Auto-starting workspace: ${activeWorkspace.name}`)
-      try {
-        await startWorkspace(activeWorkspace)
-      } catch (err) {
+      startWorkspace(activeWorkspace).catch(err => {
         console.error('[main] Failed to start workspace:', err)
-      }
+      })
     }
   } else {
     console.log('[main] Hector not installed, skipping workspace creation')

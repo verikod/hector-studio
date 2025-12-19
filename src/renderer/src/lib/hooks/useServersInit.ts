@@ -24,7 +24,22 @@ export function useServersInit() {
           // with 'authenticated' status only after the hector process is confirmed healthy.
           // This prevents the renderer from trying to connect before the server is ready.
           if (server.isLocal) {
-            setServerStatus(server.id, 'checking');
+            // Check if this is the active workspace and sync status
+            const activeId = await (window as any).api.workspace.getActive();
+            if (activeId === server.id) {
+              const status = await (window as any).api.hector.getStatus();
+              
+              // Map hector status to server status
+              let mappedStatus: ServerStatus = 'checking';
+              if (status === 'running') mappedStatus = 'authenticated';
+              else if (status === 'error') mappedStatus = 'error';
+              else if (status === 'stopped') mappedStatus = 'stopped';
+              else if (status === 'starting') mappedStatus = 'checking';
+              
+              setServerStatus(server.id, mappedStatus);
+            } else {
+              setServerStatus(server.id, 'stopped');
+            }
             continue;
           }
           

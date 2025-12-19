@@ -418,28 +418,50 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
     // Local workspaces in the renderer wait for this IPC event rather than probing directly.
     const serverUrl = `http://localhost:${port}`
     console.log(`[hector] Waiting for health check at ${serverUrl}/health...`)
-    const isHealthy = await waitForHealthy(serverUrl)
-    
-    if (isHealthy && hectorProcess && !hectorProcess.killed) {
-        setStatus('running')
-        emitWorkspaceStatus(id, 'running')
-        // Set as active server
-        serverManager.setActiveServer(id)
-        emitServersUpdated()
-    } else if (hectorProcess && !hectorProcess.killed) {
-        // Process is running but not responding to health checks - kill it
-        const errorMsg = 'Server failed to respond to health checks within timeout'
-        console.error('[hector]', errorMsg)
+
+    // Set as active server immediately to ensure persistence matches intent
+    // even if we restart before health check completes
+    serverManager.setActiveServer(id)
+    emitServersUpdated()
+
+    // Detached health check to prevent blocking UI
+    const checkHealth = async () => {
+        const proc = hectorProcess
+        if (!proc) return
+
+        const isHealthy = await waitForHealthy(serverUrl)
+
+        // Check if process was replaced while we were waiting
+        if (hectorProcess !== proc) {
+            console.log('[hector] Process replaced during health check, ignoring result')
+            return
+        }
         
-        // Terminate the unresponsive process
-        console.log('[hector] Killing unresponsive process...')
-        hectorProcess.kill('SIGKILL')
-        hectorProcess = null
-        activeWorkspaceId = null
-        
-        setStatus('error', errorMsg)
-        emitWorkspaceStatus(id, 'error', errorMsg)
+        if (isHealthy && !proc.killed) {
+            setStatus('running')
+            emitWorkspaceStatus(id, 'running')
+        } else if (!proc.killed) {
+            // Process is running but not responding to health checks - kill it
+            const errorMsg = 'Server failed to respond to health checks within timeout'
+            console.error('[hector]', errorMsg)
+            
+            // Terminate the unresponsive process
+            console.log('[hector] Killing unresponsive process...')
+            proc.kill('SIGKILL')
+            
+            // Cleanup provided we are still the global active process
+            if (hectorProcess === proc) {
+                hectorProcess = null
+                activeWorkspaceId = null
+                setStatus('error', errorMsg)
+                emitWorkspaceStatus(id, 'error', errorMsg)
+            }
+        }
     }
+
+    checkHealth().catch(err => {
+        console.error('[hector] Error in health check loop:', err)
+    })
 }
 
 /**
