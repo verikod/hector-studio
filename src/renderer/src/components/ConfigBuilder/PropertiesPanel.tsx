@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Settings } from "lucide-react";
+import { X, Settings, Bot, Zap, Shield, FileText, Users } from "lucide-react";
 import type { Node } from "@xyflow/react";
 
 interface PropertiesPanelProps {
@@ -8,6 +8,12 @@ interface PropertiesPanelProps {
   onClose: () => void;
   onUpdate?: (updates: Record<string, any>) => void;
   readonly?: boolean;
+  // Resource options for dropdowns
+  llmOptions?: string[];
+  toolOptions?: string[];
+  guardrailOptions?: string[];
+  documentStoreOptions?: string[];
+  agentOptions?: string[];
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -16,19 +22,60 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onClose,
   onUpdate,
   readonly = false,
+  llmOptions = [],
+  toolOptions = [],
+  guardrailOptions = [],
+  documentStoreOptions = [],
+  agentOptions = [],
 }) => {
   if (!node) return null;
 
-  const [localData, setLocalData] = React.useState(node.data);
+  const data = node.data as any;
+  const agentType = data?.agentType || 'llm';
+  const isWorkflow = ['sequential', 'parallel', 'loop'].includes(agentType);
+  const isRemote = agentType === 'remote';
+
+  const [localData, setLocalData] = React.useState({
+    label: data?.label || '',
+    description: data?.description || '',
+    instruction: data?.instruction || '',
+    llm: data?.llm || '',
+    tools: data?.tools || [],
+    guardrails: data?.guardrails || '',
+    documentStores: data?.documentStores || [],
+    subAgents: data?.subAgents || [],
+    agentTools: data?.agentTools || [],
+    url: data?.url || '',
+  });
 
   React.useEffect(() => {
-    setLocalData(node.data);
-  }, [node.data]);
+    setLocalData({
+      label: data?.label || '',
+      description: data?.description || '',
+      instruction: data?.instruction || '',
+      llm: data?.llm || '',
+      tools: data?.tools || [],
+      guardrails: data?.guardrails || '',
+      documentStores: data?.documentStores || [],
+      subAgents: data?.subAgents || [],
+      agentTools: data?.agentTools || [],
+      url: data?.url || '',
+    });
+  }, [data]);
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: any) => {
+    setLocalData((prev) => ({ ...prev, [field]: value }));
     if (!readonly && onUpdate) {
       onUpdate({ [field]: value });
     }
+  };
+
+  const handleMultiSelect = (field: string, value: string, checked: boolean) => {
+    const currentValues = localData[field as keyof typeof localData] as string[] || [];
+    const newValues = checked
+      ? [...currentValues, value]
+      : currentValues.filter((v) => v !== value);
+    handleChange(field, newValues);
   };
 
   return (
@@ -37,12 +84,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <div className="flex items-center gap-2">
           <Settings size={18} className="text-gray-400" />
-          <h3 className="font-semibold text-sm">Properties</h3>
-          {readonly && (
-            <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded">
-              Read-only
-            </span>
-          )}
+          <h3 className="font-semibold text-sm">Agent Properties</h3>
         </div>
         <button
           onClick={onClose}
@@ -55,115 +97,224 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Node ID */}
+        {/* Agent ID (readonly) */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">
-            Node ID
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Agent ID
           </label>
-          <div className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-gray-300">
+          <div className="px-3 py-2 bg-white/5 border border-white/10 rounded text-sm font-mono text-gray-400">
             {nodeId}
           </div>
         </div>
 
-        {/* Node Type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">
-            Type
-          </label>
-          <div className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm capitalize">
-            {node.type || "Unknown"}
+        {/* Type badge */}
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-1 text-xs font-medium rounded ${isWorkflow ? 'bg-purple-500/20 text-purple-300' :
+              isRemote ? 'bg-amber-500/20 text-amber-300' :
+                'bg-hector-green/20 text-hector-green'
+            }`}>
+            {agentType.toUpperCase()}
+          </span>
+        </div>
+
+        {/* Basic Info Section */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <Bot size={12} />
+            <span>Basic Info</span>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Display Name</label>
+            <input
+              type="text"
+              value={localData.label}
+              onChange={(e) => handleChange('label', e.target.value)}
+              disabled={readonly}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+              placeholder="e.g., Research Assistant"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Description</label>
+            <textarea
+              value={localData.description}
+              onChange={(e) => handleChange('description', e.target.value)}
+              disabled={readonly}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green resize-none disabled:opacity-50"
+              rows={2}
+              placeholder="What does this agent do?"
+            />
           </div>
         </div>
 
-        {/* Agent-specific fields */}
-        {node.type === "agent" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Agent Name
-              </label>
-              <input
-                type="text"
-                value={String(localData?.name || "")}
-                onChange={(e) =>
-                  setLocalData({ ...localData, name: e.target.value })
-                }
-                onBlur={() => handleInputChange("name", localData?.name)}
-                disabled={readonly}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+        {/* LLM & Tools Section (for non-workflow agents) */}
+        {!isWorkflow && !isRemote && (
+          <div className="space-y-3 pt-2 border-t border-white/10">
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <Zap size={12} />
+              <span>Model & Tools</span>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">LLM</label>
+              <label className="block text-sm font-medium mb-1.5">LLM</label>
               <select
-                value={String((node.data as any)?.llm || "")}
-                onChange={(e) => handleInputChange("llm", e.target.value)}
+                value={localData.llm}
+                onChange={(e) => handleChange('llm', e.target.value)}
                 disabled={readonly}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
               >
-                <option value="">Select LLM</option>
-                <option value="default">default</option>
-                <option value="openai">openai</option>
-                <option value="anthropic">anthropic</option>
-                <option value="gemini">gemini</option>
-                <option value="ollama">ollama</option>
+                <option value="">Select LLM...</option>
+                {llmOptions.map((llm) => (
+                  <option key={llm} value={llm}>{llm}</option>
+                ))}
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Description
-              </label>
-              <textarea
-                value={String((node.data as any)?.description || "")}
-                onChange={(e) =>
-                  handleInputChange("description", e.target.value)
-                }
-                disabled={readonly}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-hector-green transition-colors resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                rows={3}
-                placeholder="Describe what this agent does..."
-              />
-            </div>
+            {toolOptions.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Tools</label>
+                <div className="space-y-1 max-h-32 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+                  {toolOptions.map((tool) => (
+                    <label key={tool} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={localData.tools.includes(tool)}
+                        onChange={(e) => handleMultiSelect('tools', tool, e.target.checked)}
+                        disabled={readonly}
+                        className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                      />
+                      <span>{tool}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Instruction
-              </label>
+              <label className="block text-sm font-medium mb-1.5">Instruction</label>
               <textarea
-                value={String((node.data as any)?.instruction || "")}
-                onChange={(e) =>
-                  handleInputChange("instruction", e.target.value)
-                }
+                value={localData.instruction}
+                onChange={(e) => handleChange('instruction', e.target.value)}
                 disabled={readonly}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-hector-green transition-colors resize-none font-mono text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                rows={6}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm font-mono focus:outline-none focus:border-hector-green resize-none disabled:opacity-50"
+                rows={5}
                 placeholder="System prompt for this agent..."
               />
             </div>
-          </>
-        )}
-
-        {/* Loop-specific fields */}
-        {node.type === "loop" && (
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Max Iterations
-            </label>
-            <input
-              type="number"
-              value={(node.data as any)?.maxIterations || 3}
-              onChange={(e) =>
-                handleInputChange("maxIterations", parseInt(e.target.value))
-              }
-              disabled={readonly}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-hector-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              min={0}
-              placeholder="Number of iterations"
-            />
           </div>
         )}
+
+        {/* Workflow Sub-Agents Section */}
+        {isWorkflow && agentOptions.length > 0 && (
+          <div className="space-y-3 pt-2 border-t border-white/10">
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <Users size={12} />
+              <span>Sub-Agents</span>
+            </div>
+
+            <div className="space-y-1 max-h-40 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+              {agentOptions.map((agent) => (
+                <label key={agent} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={localData.subAgents.includes(agent)}
+                    onChange={(e) => handleMultiSelect('subAgents', agent, e.target.checked)}
+                    disabled={readonly}
+                    className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                  />
+                  <span>{agent}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Remote Agent URL */}
+        {isRemote && (
+          <div className="space-y-3 pt-2 border-t border-white/10">
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Remote URL</label>
+              <input
+                type="text"
+                value={localData.url}
+                onChange={(e) => handleChange('url', e.target.value)}
+                disabled={readonly}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                placeholder="http://localhost:9000"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Advanced Section */}
+        <div className="space-y-3 pt-2 border-t border-white/10">
+          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <Shield size={12} />
+            <span>Advanced</span>
+          </div>
+
+          {guardrailOptions.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Guardrails</label>
+              <select
+                value={localData.guardrails}
+                onChange={(e) => handleChange('guardrails', e.target.value)}
+                disabled={readonly}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+              >
+                <option value="">None</option>
+                {guardrailOptions.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {documentStoreOptions.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
+                <FileText size={12} />
+                Document Stores (RAG)
+              </label>
+              <div className="space-y-1 max-h-24 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+                {documentStoreOptions.map((store) => (
+                  <label key={store} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
+                    <input
+                      type="checkbox"
+                      checked={localData.documentStores.includes(store)}
+                      onChange={(e) => handleMultiSelect('documentStores', store, e.target.checked)}
+                      disabled={readonly}
+                      className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                    />
+                    <span>{store}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!isWorkflow && agentOptions.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Agent Tools</label>
+              <div className="space-y-1 max-h-24 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+                {agentOptions.map((agent) => (
+                  <label key={agent} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
+                    <input
+                      type="checkbox"
+                      checked={localData.agentTools.includes(agent)}
+                      onChange={(e) => handleMultiSelect('agentTools', agent, e.target.checked)}
+                      disabled={readonly}
+                      className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                    />
+                    <span>{agent}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
