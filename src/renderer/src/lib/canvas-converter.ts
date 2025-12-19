@@ -11,43 +11,53 @@ export interface GraphData {
 // Layout constants
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 80;
-const GROUP_PADDING = 40;
+const HORIZONTAL_GAP = 40;
+const VERTICAL_GAP = 40;
+const GROUP_PADDING = 60;
 
 /**
- * Apply dagre auto-layout to nodes and edges
+ * Apply dagre auto-layout to ROOT nodes only (those without parentId)
  */
 const applyDagreLayout = (
   nodes: Node[], 
   edges: Edge[], 
   direction: 'TB' | 'LR' = 'TB'
 ): Node[] => {
-  if (nodes.length === 0) return nodes;
+  // Only layout root nodes
+  const rootNodes = nodes.filter(n => !n.parentId);
+  const childNodes = nodes.filter(n => n.parentId);
+  
+  if (rootNodes.length === 0) return nodes;
 
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: direction, nodesep: 80, ranksep: 100, marginx: 50, marginy: 50 });
 
-  // Add nodes to dagre
-  nodes.forEach((node) => {
-    const width = node.style?.width as number || NODE_WIDTH;
-    const height = node.style?.height as number || NODE_HEIGHT;
+  // Add root nodes to dagre
+  rootNodes.forEach((node) => {
+    const width = (node.style?.width as number) || NODE_WIDTH;
+    const height = (node.style?.height as number) || NODE_HEIGHT;
     g.setNode(node.id, { width, height });
   });
 
-  // Add edges to dagre
+  // Add edges between root nodes only
   edges.forEach((edge) => {
-    g.setEdge(edge.source, edge.target);
+    const sourceIsRoot = rootNodes.some(n => n.id === edge.source);
+    const targetIsRoot = rootNodes.some(n => n.id === edge.target);
+    if (sourceIsRoot && targetIsRoot) {
+      g.setEdge(edge.source, edge.target);
+    }
   });
 
   // Run layout
   Dagre.layout(g);
 
-  // Apply positions back to nodes
-  return nodes.map((node) => {
+  // Apply positions back to root nodes
+  const positionedRootNodes = rootNodes.map((node) => {
     const nodeWithPosition = g.node(node.id);
     if (!nodeWithPosition) return node;
     
-    const width = node.style?.width as number || NODE_WIDTH;
-    const height = node.style?.height as number || NODE_HEIGHT;
+    const width = (node.style?.width as number) || NODE_WIDTH;
+    const height = (node.style?.height as number) || NODE_HEIGHT;
     
     return {
       ...node,
@@ -57,13 +67,40 @@ const applyDagreLayout = (
       },
     };
   });
+
+  return [...positionedRootNodes, ...childNodes];
 };
 
 /**
- * Converts YAML config to React Flow visualization with dagre auto-layout
+ * Calculate dimensions needed for a workflow container based on its children
+ */
+const calculateWorkflowDimensions = (
+  subAgents: string[],
+  workflowType: string
+): { width: number; height: number } => {
+  if (!subAgents || subAgents.length === 0) {
+    return { width: NODE_WIDTH + GROUP_PADDING * 2, height: NODE_HEIGHT + GROUP_PADDING * 2 };
+  }
+
+  if (workflowType === 'sequential') {
+    // Sequential: horizontal layout
+    const totalWidth = subAgents.length * NODE_WIDTH + (subAgents.length - 1) * HORIZONTAL_GAP + GROUP_PADDING * 2;
+    const totalHeight = NODE_HEIGHT + GROUP_PADDING * 2 + 30; // +30 for header
+    return { width: totalWidth, height: totalHeight };
+  } else {
+    // Parallel/Loop: vertical layout
+    const totalWidth = NODE_WIDTH + GROUP_PADDING * 2;
+    const totalHeight = subAgents.length * NODE_HEIGHT + (subAgents.length - 1) * VERTICAL_GAP + GROUP_PADDING * 2 + 30;
+    return { width: totalWidth, height: totalHeight };
+  }
+};
+
+/**
+ * Converts YAML config to React Flow visualization
+ * Workflow agents are containers with sub-agents as child nodes
  */
 export const yamlToGraph = (yamlContent: string): GraphData => {
-  let nodes: Node[] = [];
+  const nodes: Node[] = [];
   const edges: Edge[] = [];
 
   try {
@@ -73,96 +110,131 @@ export const yamlToGraph = (yamlContent: string): GraphData => {
       return { nodes, edges };
     }
 
-    // Track root agents vs sub-agents
-    const allSubAgents = new Set<string>();
-    Object.values(config.agents).forEach((agent) => {
-      if (agent.sub_agents) {
-        agent.sub_agents.forEach((s: string) => allSubAgents.add(s));
+    // First pass: identify which agents are sub-agents of workflows
+    const subAgentParents: Record<string, string> = {};
+    Object.entries(config.agents).forEach(([agentId, agent]) => {
+      const agentConfig = agent as AgentConfig;
+      const type = agentConfig.type || 'llm';
+      const isWorkflow = ['sequential', 'parallel', 'loop'].includes(type);
+      
+      if (isWorkflow && agentConfig.sub_agents) {
+        agentConfig.sub_agents.forEach((subId: string) => {
+          subAgentParents[subId] = agentId;
+        });
       }
     });
 
-    // Process each agent
+    // Second pass: create all nodes
     Object.entries(config.agents).forEach(([agentId, agent]) => {
       const agentConfig = agent as AgentConfig;
       const type = agentConfig.type || 'llm';
       const isWorkflow = ['sequential', 'parallel', 'loop'].includes(type);
       const isRemote = type === 'remote';
+      const parentId = subAgentParents[agentId];
 
-      // Create node
-      nodes.push({
-        id: agentId,
-        type: isWorkflow ? 'workflowGroup' : 'agent',
-        position: { x: 0, y: 0 }, // Will be set by dagre
-        data: {
-          label: agentConfig.name || agentId,
-          agentId,
-          agentType: type,
-          llm: agentConfig.llm,
-          description: agentConfig.description,
-          instruction: agentConfig.instruction,
-          tools: agentConfig.tools,
-          subAgents: agentConfig.sub_agents,
-          agentTools: agentConfig.agent_tools,
-          guardrails: agentConfig.guardrails,
-          documentStores: agentConfig.document_stores,
-          isRemote,
-          url: agentConfig.url,
-          // Full config for editing
-          config: agentConfig,
-        },
-        style: {
-          width: isWorkflow ? NODE_WIDTH + GROUP_PADDING * 2 : NODE_WIDTH,
-          height: isWorkflow ? NODE_HEIGHT + GROUP_PADDING : NODE_HEIGHT,
-        },
-      });
+      if (isWorkflow) {
+        // Workflow container node
+        const dimensions = calculateWorkflowDimensions(
+          agentConfig.sub_agents || [],
+          type
+        );
 
-      // Create edges for sub_agents (workflow children)
-      if (agentConfig.sub_agents && agentConfig.sub_agents.length > 0) {
-        agentConfig.sub_agents.forEach((subAgentId: string, index: number) => {
-          // Edge from parent to child
-          edges.push({
-            id: `${agentId}->${subAgentId}`,
-            source: agentId,
-            target: subAgentId,
-            type: 'smoothstep',
-            style: { 
-              stroke: type === 'sequential' ? '#3b82f6' : 
-                      type === 'parallel' ? '#a855f7' : 
-                      type === 'loop' ? '#14b8a6' : '#6b7280',
-              strokeWidth: 2,
-            },
-            animated: type === 'loop',
-          });
-
-          // For sequential, also add edges between siblings
-          if (type === 'sequential' && index < agentConfig.sub_agents!.length - 1) {
-            const nextSubAgentId = agentConfig.sub_agents![index + 1];
-            edges.push({
-              id: `${subAgentId}-seq->${nextSubAgentId}`,
-              source: subAgentId,
-              target: nextSubAgentId,
-              type: 'smoothstep',
-              style: { stroke: '#3b82f6', strokeWidth: 2 },
-            });
-          }
+        nodes.push({
+          id: agentId,
+          type: 'workflowGroup',
+          position: { x: 0, y: 0 },
+          data: {
+            label: agentConfig.name || agentId,
+            agentId,
+            agentType: type,
+            workflowType: type,
+            subAgents: agentConfig.sub_agents || [],
+            maxIterations: (agentConfig as any).loop?.max_iterations,
+            config: agentConfig,
+          },
+          style: {
+            width: dimensions.width,
+            height: dimensions.height,
+          },
         });
 
-        // Loop back edge
-        if (type === 'loop' && agentConfig.sub_agents.length > 1) {
-          const lastChild = agentConfig.sub_agents[agentConfig.sub_agents.length - 1];
-          const firstChild = agentConfig.sub_agents[0];
-          edges.push({
-            id: `loop-${lastChild}->${firstChild}`,
-            source: lastChild,
-            target: firstChild,
-            type: 'smoothstep',
-            style: { stroke: '#14b8a6', strokeWidth: 2, strokeDasharray: '5 5' },
-            animated: true,
+        // Create child nodes positioned inside the container
+        if (agentConfig.sub_agents) {
+          agentConfig.sub_agents.forEach((subAgentId: string, index: number) => {
+            const subAgent = config.agents?.[subAgentId];
+            if (!subAgent) return;
+
+            let childX: number, childY: number;
+            
+            if (type === 'sequential') {
+              // Horizontal layout
+              childX = GROUP_PADDING + index * (NODE_WIDTH + HORIZONTAL_GAP);
+              childY = GROUP_PADDING + 30; // Below header
+            } else {
+              // Vertical layout for parallel/loop
+              childX = GROUP_PADDING;
+              childY = GROUP_PADDING + 30 + index * (NODE_HEIGHT + VERTICAL_GAP);
+            }
+
+            nodes.push({
+              id: subAgentId,
+              type: 'agent',
+              position: { x: childX, y: childY },
+              parentId: agentId, // This makes it a child of the workflow
+              extent: 'parent' as const,
+              data: {
+                label: subAgent.name || subAgentId,
+                agentId: subAgentId,
+                agentType: subAgent.type || 'llm',
+                llm: subAgent.llm,
+                description: subAgent.description,
+                instruction: subAgent.instruction,
+                tools: subAgent.tools,
+                subAgents: subAgent.sub_agents,
+                agentTools: subAgent.agent_tools,
+                guardrails: subAgent.guardrails,
+                documentStores: subAgent.document_stores,
+                isRemote: subAgent.type === 'remote',
+                url: subAgent.url,
+                config: subAgent,
+              },
+              style: {
+                width: NODE_WIDTH,
+                height: NODE_HEIGHT,
+              },
+            });
           });
         }
+      } else if (!parentId) {
+        // Regular agent (not a child of a workflow) - only add if not already added as child
+        nodes.push({
+          id: agentId,
+          type: 'agent',
+          position: { x: 0, y: 0 },
+          data: {
+            label: agentConfig.name || agentId,
+            agentId,
+            agentType: type,
+            llm: agentConfig.llm,
+            description: agentConfig.description,
+            instruction: agentConfig.instruction,
+            tools: agentConfig.tools,
+            subAgents: agentConfig.sub_agents,
+            agentTools: agentConfig.agent_tools,
+            guardrails: agentConfig.guardrails,
+            documentStores: agentConfig.document_stores,
+            isRemote,
+            url: agentConfig.url,
+            config: agentConfig,
+          },
+          style: {
+            width: NODE_WIDTH,
+            height: NODE_HEIGHT,
+          },
+        });
       }
 
-      // Create edges for agent_tools
+      // Create edges for agent_tools (agents used as tools by other agents)
       if (agentConfig.agent_tools) {
         agentConfig.agent_tools.forEach((toolAgentId: string) => {
           edges.push({
@@ -171,15 +243,17 @@ export const yamlToGraph = (yamlContent: string): GraphData => {
             target: toolAgentId,
             type: 'smoothstep',
             style: { stroke: '#f59e0b', strokeWidth: 2, strokeDasharray: '3 3' },
+            label: 'uses as tool',
+            labelStyle: { fill: '#f59e0b', fontSize: 10 },
           });
         });
       }
     });
 
-    // Apply dagre auto-layout
-    nodes = applyDagreLayout(nodes, edges, 'TB');
+    // Apply dagre layout to root nodes only
+    const layoutedNodes = applyDagreLayout(nodes, edges, 'TB');
 
-    return { nodes, edges };
+    return { nodes: layoutedNodes, edges };
   } catch (error) {
     console.error('Failed to parse YAML for graph:', error);
     return { nodes: [], edges: [] };
