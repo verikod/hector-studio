@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   type Node,
   type Edge,
   BackgroundVariant,
@@ -204,18 +203,7 @@ export const CanvasMode: React.FC<CanvasModeProps> = ({ yamlContent }) => {
           <Controls
             className="!bg-black/60 !border !border-white/10 !rounded-lg !shadow-lg [&>button]:!bg-black/40 [&>button]:!border-white/10 [&>button]:!text-gray-300 [&>button:hover]:!bg-white/10"
             showInteractive={false}
-          />
-          <MiniMap
-            className="bg-black/60 border border-white/10 rounded-lg"
-            nodeColor={(node) => {
-              const type = (node.data as any)?.agentType;
-              if (type === 'sequential') return '#3b82f6';
-              if (type === 'parallel') return '#a855f7';
-              if (type === 'loop') return '#14b8a6';
-              if (type === 'remote') return '#f59e0b';
-              return '#10b981';
-            }}
-            maskColor="rgba(0, 0, 0, 0.7)"
+            position="bottom-right"
           />
         </ReactFlow>
       </div>
