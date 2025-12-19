@@ -58,13 +58,22 @@ function App() {
   };
 
   // Called when wizard completes successfully
-  const handleEnableWorkspacesComplete = (workspaceId?: string) => {
+  // Called when wizard completes successfully
+  const handleEnableWorkspacesComplete = async (workspaceId?: string) => {
     setWorkspacesEnabled(true);
     setShowEnableWorkspacesModal(false);
 
     // Explicitly select the workspace that was just started
     if (workspaceId) {
-      useServersStore.getState().selectServer(workspaceId);
+      // Ensure the store knows about the new workspace before selecting
+      // Race condition fix: fetch list immediately
+      try {
+        const servers = await window.api.server.list();
+        useServersStore.getState().syncFromMain(servers);
+        useServersStore.getState().selectServer(workspaceId);
+      } catch (e) {
+        console.error('Failed to sync servers after enable:', e);
+      }
     }
   };
 
