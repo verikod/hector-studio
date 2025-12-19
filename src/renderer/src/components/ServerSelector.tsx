@@ -20,9 +20,10 @@ interface ServerSelectorProps {
     onLogoutRequest: (serverId: string) => void;
     workspacesEnabled: boolean;
     onEnableWorkspaces: () => void;
+    isLicensed: boolean;
 }
 
-export function ServerSelector({ onLoginRequest, onLogoutRequest, workspacesEnabled, onEnableWorkspaces }: ServerSelectorProps) {
+export function ServerSelector({ onLoginRequest, onLogoutRequest, workspacesEnabled, onEnableWorkspaces, isLicensed }: ServerSelectorProps) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [newName, setNewName] = useState('');
     const [newUrl, setNewUrl] = useState('');
@@ -316,14 +317,22 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, workspacesEnab
                 ) : (
                     <>
                         {workspacesEnabled ? (
-                            <DropdownMenuItem onSelect={() => handleAddWorkspace()} className="cursor-pointer focus:bg-gray-800 focus:text-white">
+                            <DropdownMenuItem
+                                onSelect={() => isLicensed && handleAddWorkspace()}
+                                className={`cursor-pointer focus:bg-gray-800 focus:text-white ${!isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={!isLicensed}
+                            >
                                 <FolderOpen size={14} className="mr-2" />
-                                Add Workspace
+                                Add Workspace {!isLicensed && '(License required)'}
                             </DropdownMenuItem>
                         ) : (
-                            <DropdownMenuItem onSelect={() => onEnableWorkspaces()} className="cursor-pointer focus:bg-gray-800 focus:text-white">
+                            <DropdownMenuItem
+                                onSelect={() => isLicensed && onEnableWorkspaces()}
+                                className={`cursor-pointer focus:bg-gray-800 focus:text-white ${!isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={!isLicensed}
+                            >
                                 <FolderOpen size={14} className="mr-2" />
-                                Enable Local Workspaces
+                                Enable Local Workspaces {!isLicensed && '(License required)'}
                             </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowAddForm(true); }} className="cursor-pointer focus:bg-gray-800 focus:text-white">

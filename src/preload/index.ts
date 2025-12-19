@@ -75,6 +75,16 @@ const api = {
     }
   },
 
+  // License management
+  license: {
+    getStatus: () => ipcRenderer.invoke('license:status'),
+    create: (email: string) => ipcRenderer.invoke('license:create', email),
+    activate: (key: string) => ipcRenderer.invoke('license:activate', key),
+    validate: () => ipcRenderer.invoke('license:validate'),
+    deactivate: () => ipcRenderer.invoke('license:deactivate'),
+    getPortalUrl: () => ipcRenderer.invoke('license:portal-url')
+  },
+
   // App lifecycle
   app: {
     onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => void) => {

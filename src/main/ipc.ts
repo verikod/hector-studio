@@ -17,6 +17,19 @@ import {
   getLogs,
   clearLogs
 } from './hector/manager'
+import {
+  validateLicenseOnline,
+  activateLicense,
+  getCheckoutUrl
+} from './license/lemonsqueezy'
+import {
+  getStoredLicense,
+  storeLicense,
+  removeLicense,
+  getLicenseStatus,
+  isOfflineValidationAllowed,
+  updateLastValidated
+} from './license/store'
 
 export function registerIPCHandlers(): void {
   // Server Management
@@ -199,4 +212,57 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('workspace:open-folder', async (_, path: string) => {
     return shell.openPath(path)
   })
+
+  // License Management
+  ipcMain.handle('license:status', () => getLicenseStatus())
+
+  // License:create removed - users get licenses via LemonSqueezy checkout
+  // Keeping for backwards compatibility, but it does nothing
+  ipcMain.handle('license:create', async () => {
+    return { success: false, error: 'Please get your license from the checkout page' }
+  })
+
+  ipcMain.handle('license:activate', async (_, key: string) => {
+    // First try to activate (increments activation count)
+    const activation = await activateLicense(key)
+    if (activation.valid && activation.license) {
+      storeLicense(key, activation.license.email, 'active')
+      return { success: true, license: activation.license }
+    }
+    // If activation fails, try validation only
+    const validation = await validateLicenseOnline(key)
+    if (validation.valid && validation.license) {
+      storeLicense(key, validation.license.email, 'active')
+      return { success: true, license: validation.license }
+    }
+    return { success: false, error: validation.message }
+  })
+
+  ipcMain.handle('license:validate', async () => {
+    const stored = getStoredLicense()
+    if (!stored) {
+      return { valid: false, reason: 'No license stored' }
+    }
+
+    // Try online validation first
+    const validation = await validateLicenseOnline(stored.key)
+    if (validation.valid) {
+      updateLastValidated()
+      return { valid: true, license: stored }
+    }
+
+    // Fall back to offline validation if allowed
+    if (isOfflineValidationAllowed()) {
+      return { valid: true, license: stored, offline: true }
+    }
+
+    return { valid: false, reason: validation.message }
+  })
+
+  ipcMain.handle('license:deactivate', () => {
+    removeLicense()
+    return { success: true }
+  })
+
+  ipcMain.handle('license:portal-url', () => getCheckoutUrl())
 }

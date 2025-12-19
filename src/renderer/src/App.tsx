@@ -17,6 +17,7 @@ import { EnableWorkspacesModal } from "./components/EnableWorkspacesModal";
 import { UpdateNotification } from "./components/UpdateNotification";
 import { UpdateRuntimeCover } from "./components/UpdateRuntimeCover";
 import { LogDrawer } from "./components/LogDrawer";
+import { LicenseModal } from "./components/LicenseModal";
 
 // App lifecycle states
 type AppState = 'initializing' | 'needs_download' | 'needs_update' | 'downloading' | 'ready';
@@ -102,6 +103,26 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'vs-light' | 'hc-black'>('hc-black');
   const [showLogDrawer, setShowLogDrawer] = useState(false);
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [isLicensed, setIsLicensed] = useState<boolean | null>(null); // null = checking
+
+  // Check license status on mount and show modal if unlicensed
+  useEffect(() => {
+    window.api.license.getStatus().then((status) => {
+      console.log('[App] License status:', status.isLicensed ? 'licensed' : 'unlicensed');
+      setIsLicensed(status.isLicensed);
+
+      // Show license modal on app launch if not licensed
+      if (!status.isLicensed) {
+        setShowLicenseModal(true);
+      }
+    });
+  }, []);
+
+  // Expose license status for debugging
+  useEffect(() => {
+    (window as any).__hectorLicense = { isLicensed, showModal: () => setShowLicenseModal(true) };
+  }, [isLicensed]);
 
   // Listen for open-log-drawer events from ServerList/ServerDropdown
   useEffect(() => {
@@ -240,6 +261,7 @@ function App() {
         onOpenSettings={() => setShowSettings(true)}
         workspacesEnabled={workspacesEnabled}
         onEnableWorkspaces={handleEnableWorkspaces}
+        isLicensed={!!isLicensed}
       />
 
       {/* Main Content - flex-1 with min-h-0 to allow shrinking */}
@@ -270,6 +292,23 @@ function App() {
         )}
       </main>
 
+      {/* License Upgrade Banner - shown for unlicensed users */}
+      {isLicensed === false && (
+        <button
+          onClick={() => setShowLicenseModal(true)}
+          className="w-full px-4 py-2.5 bg-gradient-to-r from-hector-green/20 to-blue-500/20 border-t border-hector-green/30 hover:from-hector-green/30 hover:to-blue-500/30 transition-all group"
+        >
+          <div className="flex items-center justify-center gap-2 text-sm">
+            <span className="text-hector-green">🎫</span>
+            <span className="text-gray-300 group-hover:text-white transition-colors">
+              <span className="text-hector-green font-medium">Enable Studio Mode</span>
+              {" "}— It's free! Get your Early Access license
+            </span>
+            <span className="text-gray-500 group-hover:text-gray-300 transition-colors">→</span>
+          </div>
+        </button>
+      )}
+
       {/* Modals & Overlays */}
       {loginServer && (
         <LoginModal
@@ -286,6 +325,11 @@ function App() {
         onThemeChange={setEditorTheme}
         workspacesEnabled={workspacesEnabled}
         onWorkspacesChange={setWorkspacesEnabled}
+        onLicenseDeactivated={() => {
+          setIsLicensed(false);
+          setShowLicenseModal(true);
+        }}
+        isLicensed={!!isLicensed}
       />
       <EnableWorkspacesModal
         isOpen={showEnableWorkspacesModal}
@@ -298,6 +342,19 @@ function App() {
       <LogDrawer
         isOpen={showLogDrawer}
         onClose={() => setShowLogDrawer(false)}
+      />
+      <LicenseModal
+        isOpen={showLicenseModal}
+        onClose={() => setShowLicenseModal(false)}
+        onLicenseActivated={() => {
+          setIsLicensed(true);
+          setShowLicenseModal(false);
+        }}
+        onSkip={() => {
+          // User skipped license - they get chat-only mode
+          console.log('[App] User skipped license activation');
+          setShowLicenseModal(false);
+        }}
       />
     </div>
   );

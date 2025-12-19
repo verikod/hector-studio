@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, Monitor, RefreshCw, FolderOpen } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Monitor, RefreshCw, FolderOpen, Key, Trash2 } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import { useServersStore } from "../../store/serversStore";
 
@@ -10,6 +10,8 @@ interface SettingsModalProps {
   onThemeChange: (theme: 'vs-dark' | 'vs-light' | 'hc-black') => void;
   workspacesEnabled?: boolean;
   onWorkspacesChange?: (enabled: boolean) => void;
+  onLicenseDeactivated?: () => void;
+  isLicensed?: boolean; // Used to trigger refetch
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -19,14 +21,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onThemeChange,
   workspacesEnabled = false,
   onWorkspacesChange,
+  onLicenseDeactivated,
+  isLicensed,
 }) => {
   const streamingEnabled = useStore((state) => state.streamingEnabled);
   const setStreamingEnabled = useStore((state) => state.setStreamingEnabled);
   const [workspacesLoading, setWorkspacesLoading] = useState(false);
+  const [licenseStatus, setLicenseStatus] = useState<{ isLicensed: boolean; email: string | null; key: string | null } | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   const servers = useServersStore((s) => s.servers);
   const activeServerId = useServersStore((s) => s.activeServerId);
   const selectServer = useServersStore((s) => s.selectServer);
+
+  // Fetch license status when modal opens or license state changes
+  useEffect(() => {
+    if (isOpen) {
+      window.api.license.getStatus().then(setLicenseStatus);
+    }
+  }, [isOpen, isLicensed]);
+
+  const handleDeactivate = async () => {
+    setDeactivating(true);
+    await window.api.license.deactivate();
+    setLicenseStatus({ isLicensed: false, email: null, key: null });
+    setDeactivating(false);
+    onLicenseDeactivated?.();
+  };
 
   if (!isOpen) return null;
 
@@ -137,14 +158,70 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
+            {/* License Status */}
+            <div className="pt-4 border-t border-white/10">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
+                <Key size={16} className="text-hector-green" />
+                License
+              </div>
+              {licenseStatus?.isLicensed ? (
+                <div className="space-y-3">
+                  <div className="bg-hector-green/10 border border-hector-green/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-hector-green text-sm font-medium">
+                      ✓ Studio Mode Active
+                    </div>
+                    {licenseStatus.email && (
+                      <div className="text-xs text-gray-400 mt-1">{licenseStatus.email}</div>
+                    )}
+                    {licenseStatus.key && (
+                      <div className="mt-2 pt-2 border-t border-hector-green/20">
+                        <div className="text-xs text-gray-500 mb-1">License Key (save this!):</div>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs text-gray-300 bg-black/30 px-2 py-1 rounded font-mono truncate flex-1">
+                            {licenseStatus.key}
+                          </code>
+                          <button
+                            onClick={() => navigator.clipboard.writeText(licenseStatus.key!)}
+                            className="text-xs text-gray-400 hover:text-white px-2 py-1 bg-white/5 hover:bg-white/10 rounded transition-colors"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleDeactivate}
+                    disabled={deactivating}
+                    className="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={14} />
+                    {deactivating ? 'Deactivating...' : 'Deactivate License'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                  <div className="text-yellow-400 text-sm font-medium">
+                    Chat Mode Only
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Activate a license to unlock Studio Mode features
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Workspaces */}
             {onWorkspacesChange && (
               <div className="pt-4 border-t border-white/10">
-                <label className="flex items-center justify-between cursor-pointer group">
+                <label className={`flex items-center justify-between cursor-pointer group ${!licenseStatus?.isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <div>
                     <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
                       <FolderOpen size={16} className="text-hector-green" />
                       Local Workspaces
+                      {!licenseStatus?.isLicensed && (
+                        <span className="text-xs text-yellow-500 ml-2">(License required)</span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
                       Run hector locally with managed workspaces
@@ -154,7 +231,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <input
                       type="checkbox"
                       checked={workspacesEnabled}
-                      disabled={workspacesLoading}
+                      disabled={workspacesLoading || !licenseStatus?.isLicensed}
                       onChange={async (e) => {
                         const newValue = e.target.checked;
                         setWorkspacesLoading(true);

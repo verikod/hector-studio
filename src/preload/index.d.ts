@@ -69,6 +69,14 @@ declare global {
       clearLogs: () => Promise<{ success: boolean }>
       onLog: (callback: (entry: { line: string, isError: boolean, timestamp: number }) => void) => () => void
     }
+    license: {
+      getStatus: () => Promise<{ isLicensed: boolean, email: string | null, key: string | null, activatedAt: string | null, status: string | null }>
+      create: (email: string) => Promise<{ success: boolean, key?: string, error?: string }>
+      activate: (key: string) => Promise<{ success: boolean, license?: any, error?: string }>
+      validate: () => Promise<{ valid: boolean, license?: any, offline?: boolean, reason?: string }>
+      deactivate: () => Promise<{ success: boolean }>
+      getPortalUrl: () => Promise<string>
+    }
     app: {
       onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => void) => () => void
       checkUpdate: () => Promise<any>
