@@ -1,16 +1,24 @@
 import { useStore } from "../store/useStore";
+import { useServersStore } from "../store/serversStore";
 
 /**
  * Get the base URL for API requests.
- * In Electron, this uses the configured endpoint URL (defaults to localhost:8080).
- * Falls back to window.location.origin for web deployments.
+ * Single source of truth: derives from active server in serversStore.
+ * Falls back to useStore.endpointUrl for backward compatibility (will be removed).
  */
 export function getBaseUrl(): string {
-    // Get from store (this works because zustand supports getState outside React)
+    // Primary source: active server from serversStore
+    const activeServer = useServersStore.getState().getActiveServer();
+    if (activeServer?.status === 'authenticated') {
+        return activeServer.config.url.replace(/\/$/, ''); // Remove trailing slash
+    }
+
+    // Fallback: legacy endpointUrl from useStore (deprecated)
     const endpointUrl = useStore.getState().endpointUrl;
     if (endpointUrl) {
-        return endpointUrl.replace(/\/$/, ''); // Remove trailing slash
+        return endpointUrl.replace(/\/$/, '');
     }
+
     // Default for Electron - hector server typically runs on 8080
     return "http://localhost:8080";
 }

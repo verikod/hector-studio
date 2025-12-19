@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Loader2, FolderOpen, CheckCircle, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useWorkspaceControl } from '../lib/hooks/useWorkspaceControl';
@@ -23,6 +23,14 @@ export const EnableWorkspacesModal: React.FC<EnableWorkspacesModalProps> = ({
     const [stage, setStage] = useState<EnableStage>('consent');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const { enableAndSelect } = useWorkspaceControl();
+
+    // Reset modal state when it opens
+    useEffect(() => {
+        if (isOpen) {
+            setStage('consent');
+            setErrorMessage(null);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 

@@ -29,7 +29,8 @@ export const StudioMode: React.FC = () => {
 
   // Local UI State
   const [lastValidYaml, setLastValidYaml] = useState<string>('');
-  const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'vs-light' | 'hc-black'>('hc-black');
+  const editorTheme = useStore((s) => s.editorTheme);
+  const setEditorTheme = useStore((s) => s.setEditorTheme);
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);

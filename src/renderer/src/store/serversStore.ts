@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { ServerConfig, ServerState, ServerStatus, Agent } from '../types';
+import type { ServerConfig, ServerState, ServerStatus } from '../types';
 
 interface ServersStore {
   // State
@@ -18,9 +18,8 @@ interface ServersStore {
   
   // Status transitions
   setServerStatus: (id: string, status: ServerStatus, error?: string) => void;
-  
+
   // Data updates
-  setServerAgents: (id: string, agents: Agent[]) => void;
   setServerConfig: (id: string, yaml: string) => void;
   
   // Workspaces
@@ -98,23 +97,6 @@ export const useServersStore = create<ServersStore>()(
                 ...server,
                 status,
                 lastError: error ?? null,
-              },
-            },
-          };
-        });
-      },
-      
-      setServerAgents: (id: string, agents: Agent[]) => {
-        set((state) => {
-          const server = state.servers[id];
-          if (!server) return state;
-          
-          return {
-            servers: {
-              ...state.servers,
-              [id]: {
-                ...server,
-                agents,
               },
             },
           };

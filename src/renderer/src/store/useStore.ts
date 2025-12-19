@@ -28,6 +28,8 @@ interface AppState {
   setError: (error: string | null) => void;
   successMessage: string | null;
   setSuccessMessage: (message: string | null) => void;
+  editorTheme: 'vs-dark' | 'vs-light' | 'hc-black';
+  setEditorTheme: (theme: 'vs-dark' | 'vs-light' | 'hc-black') => void;
 
   // Streaming optimization: separate buffer for high-frequency text updates
   // This prevents re-rendering entire message structure on every token
@@ -164,6 +166,8 @@ export const useStore = create<AppState>()(
       setError: (error) => set({ error }),
       successMessage: null,
       setSuccessMessage: (successMessage) => set({ successMessage }),
+      editorTheme: 'hc-black',
+      setEditorTheme: (theme) => set({ editorTheme: theme }),
 
       // Streaming text buffer (optimized for high-frequency updates)
       streamingTextContent: {},
@@ -743,7 +747,10 @@ export const useStore = create<AppState>()(
                       logger.error(
                         "localStorage quota exceeded and max retries reached. Persistence disabled.",
                       );
-                      // Gracefully degrade - app continues without persistence
+                      // Notify user about storage issue
+                      useStore.getState().setError(
+                        "Chat history storage is full. Some conversations may not be saved. Please clear old sessions or browser data."
+                      );
                     }
                   } else {
                     logger.error("Failed to write to localStorage:", error);

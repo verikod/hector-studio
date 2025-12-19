@@ -21,6 +21,7 @@ import { UpdateNotification } from "./components/UpdateNotification";
 import { UpdateRuntimeCover } from "./components/UpdateRuntimeCover";
 import { LogDrawer } from "./components/LogDrawer";
 import { LicenseModal } from "./components/LicenseModal";
+import { DEFAULT_SUPPORTED_FILE_TYPES } from "./lib/constants";
 
 // App lifecycle states
 type AppState = 'initializing' | 'needs_download' | 'needs_update' | 'downloading' | 'ready';
@@ -113,7 +114,6 @@ function App() {
   const loadAgents = useStore((state) => state.loadAgents);
   const createSession = useStore((state) => state.createSession);
   const currentSessionId = useStore((state) => state.currentSessionId);
-  const setEndpointUrl = useStore((state) => state.setEndpointUrl);
 
   const activeServer = useServersStore((s) => s.getActiveServer());
   const setServerStatus = useServersStore((s) => s.setServerStatus);
@@ -122,7 +122,8 @@ function App() {
   const [loginServerId, setLoginServerId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'vs-light' | 'hc-black'>('hc-black');
+  const editorTheme = useStore((state) => state.editorTheme);
+  const setEditorTheme = useStore((state) => state.setEditorTheme);
   const [showLogDrawer, setShowLogDrawer] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
 
@@ -161,21 +162,35 @@ function App() {
     }
   }, [currentSessionId, createSession]);
 
-  // When active server changes, update endpoint and load agents
+  // When active server changes, load agents and reset state
   useEffect(() => {
     if (activeServer?.status === 'authenticated') {
-      setEndpointUrl(activeServer.config.url);
-
       // Start a fresh chat session for the new server (only if ID changed)
       if (activeServerIdRef.current !== activeServer.config.id) {
-        createSession();
-        activeServerIdRef.current = activeServer.config.id;
-      }
+        // CRITICAL FIX: Abort any active stream before switching
+        const { cancelGeneration } = useStore.getState();
+        cancelGeneration();
 
-      // Reset agent state completely before reloading for new server
-      useStore.getState().setAvailableAgents([]);
-      useStore.setState({ agentsLoaded: false }); // Reset idempotency guard
-      loadAgents();
+        // Complete state reset for new workspace
+        useStore.getState().setAvailableAgents([]);
+        useStore.getState().setAgentCard(null);
+        useStore.getState().setSupportedFileTypes([...DEFAULT_SUPPORTED_FILE_TYPES]);
+        useStore.getState().setSchema(null);
+        useStore.setState({ agentsLoaded: false }); // Reset idempotency guard
+
+        // Load agents first, then create session
+        (async () => {
+          await loadAgents();
+          createSession();
+        })();
+
+        activeServerIdRef.current = activeServer.config.id;
+      } else {
+        // Same server, just reload agents without creating new session
+        useStore.getState().setAvailableAgents([]);
+        useStore.setState({ agentsLoaded: false });
+        loadAgents();
+      }
 
       // Check if server has studio mode enabled
       const checkStudioMode = async () => {
@@ -196,7 +211,7 @@ function App() {
       };
       checkStudioMode();
     }
-  }, [activeServer?.config.id, activeServer?.status, setEndpointUrl, loadAgents]);
+  }, [activeServer?.config.id, activeServer?.status, loadAgents, createSession]);
 
   const handleLoginRequest = (serverId: string) => {
     setLoginServerId(serverId);
