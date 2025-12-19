@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, Loader2, FolderOpen, CheckCircle, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useWorkspaceControl } from '../lib/hooks/useWorkspaceControl';
 
 type EnableStage = 'consent' | 'downloading' | 'creating' | 'starting' | 'complete' | 'error';
 
@@ -24,6 +25,8 @@ export const EnableWorkspacesModal: React.FC<EnableWorkspacesModalProps> = ({
 
     if (!isOpen) return null;
 
+    const { enableAndSelect } = useWorkspaceControl();
+
     const handleEnable = async () => {
         try {
             // Check if hector is already installed
@@ -40,7 +43,9 @@ export const EnableWorkspacesModal: React.FC<EnableWorkspacesModalProps> = ({
 
             // Stage 3: Starting
             setStage('starting');
-            const result = await window.api.workspaces.enable();
+
+            // Use centralized logic
+            const workspaceId = await enableAndSelect();
 
             // Give time for status change events to propagate
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -51,7 +56,7 @@ export const EnableWorkspacesModal: React.FC<EnableWorkspacesModalProps> = ({
             // Auto-close after brief delay
             // Pass the workspaceId back to the parent
             setTimeout(() => {
-                onComplete((result as any).workspaceId);
+                onComplete(workspaceId);
             }, 1000);
 
         } catch (error) {
