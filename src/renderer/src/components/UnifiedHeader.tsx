@@ -1,7 +1,7 @@
 import { Rocket, Settings, DownloadCloud, LayoutTemplate, MessageSquare, Split } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useServersStore } from '../store/serversStore';
-import { useLicenseStore } from '../store/licenseStore';
+
 import { ServerSelector } from './ServerSelector';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -29,9 +29,7 @@ interface UnifiedHeaderProps {
 export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings, onEnableWorkspaces }: UnifiedHeaderProps) {
     const activeServer = useServersStore((s) => s.getActiveServer());
 
-    // Use stores directly for immediate sync
-    const workspacesEnabled = useServersStore((s) => s.workspacesEnabled);
-    const isLicensed = useLicenseStore((s) => s.isLicensed);
+
 
     // Studio State
     const studioViewMode = useStore((s) => s.studioViewMode);
