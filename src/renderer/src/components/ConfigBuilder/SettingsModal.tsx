@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { X, Monitor, RefreshCw, FolderOpen, Key, Trash2 } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import { useServersStore } from "../../store/serversStore";
+import { useLicenseStore } from "../../store/licenseStore";
 
 import { useWorkspaceControl } from "../../lib/hooks/useWorkspaceControl";
 import { useLicenseControl } from "../../lib/hooks/useLicenseControl";
@@ -11,10 +12,9 @@ interface SettingsModalProps {
   onClose: () => void;
   editorTheme: 'vs-dark' | 'vs-light' | 'hc-black';
   onThemeChange: (theme: 'vs-dark' | 'vs-light' | 'hc-black') => void;
-  workspacesEnabled?: boolean;
-  onWorkspacesChange?: (enabled: boolean) => void;
+  workspacesEnabled?: boolean; // TODO: remove after migration complete
   onLicenseDeactivated?: () => void;
-  isLicensed?: boolean; // Used to trigger refetch
+  isLicensed?: boolean; // TODO: remove after migration complete
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -22,40 +22,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   editorTheme,
   onThemeChange,
-  workspacesEnabled = false,
-  onWorkspacesChange,
   onLicenseDeactivated,
-  isLicensed,
 }) => {
   const streamingEnabled = useStore((state) => state.streamingEnabled);
   const setStreamingEnabled = useStore((state) => state.setStreamingEnabled);
-  const [licenseStatus, setLicenseStatus] = useState<{ isLicensed: boolean; email: string | null; key: string | null } | null>(null);
+
+  // Centralized state from stores
+  const workspacesEnabled = useServersStore((s) => s.workspacesEnabled);
+
+  // Select individual values to avoid creating new objects (causes infinite loop)
+  const licenseIsLicensed = useLicenseStore((s) => s.isLicensed);
+  const licenseEmail = useLicenseStore((s) => s.email);
+  const licenseKey = useLicenseStore((s) => s.key);
 
   const { enableAndSelect, disableWorkspaces, isLoading: controlLoading } = useWorkspaceControl();
 
-  const servers = useServersStore((s) => s.servers);
-  const activeServerId = useServersStore((s) => s.activeServerId);
-  const selectServer = useServersStore((s) => s.selectServer);
-
-  const { deactivate, getStatus, isLoading: licenseLoading } = useLicenseControl();
-
-  // Fetch license status when modal opens or license state changes
-  useEffect(() => {
-    if (isOpen) {
-      getStatus().then(setLicenseStatus);
-    }
-  }, [isOpen, isLicensed, getStatus]);
+  const { deactivate, isLoading: licenseLoading } = useLicenseControl();
 
   const handleDeactivate = async () => {
-    // No local loading state needed, hook handles it? 
-    // Actually we need to reflect it in the button.
-    // And calling deactivate() handles the API.
     try {
       await deactivate();
-      setLicenseStatus({ isLicensed: false, email: null, key: null });
+      // License state updated via IPC event in useLicenseInit
       onLicenseDeactivated?.();
     } catch (e) {
-      // Error handled in hook or ignored here
+      // Error handled in hook
     }
   };
 
@@ -174,24 +164,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Key size={16} className="text-hector-green" />
                 License
               </div>
-              {licenseStatus?.isLicensed ? (
+              {licenseIsLicensed ? (
                 <div className="space-y-3">
                   <div className="bg-hector-green/10 border border-hector-green/30 rounded-lg p-3">
                     <div className="flex items-center gap-2 text-hector-green text-sm font-medium">
                       ✓ Studio Mode Active
                     </div>
-                    {licenseStatus.email && (
-                      <div className="text-xs text-gray-400 mt-1">{licenseStatus.email}</div>
+                    {licenseEmail && (
+                      <div className="text-xs text-gray-400 mt-1">{licenseEmail}</div>
                     )}
-                    {licenseStatus.key && (
+                    {licenseKey && (
                       <div className="mt-2 pt-2 border-t border-hector-green/20">
                         <div className="text-xs text-gray-500 mb-1">License Key (save this!):</div>
                         <div className="flex items-center gap-2">
                           <code className="text-xs text-gray-300 bg-black/30 px-2 py-1 rounded font-mono truncate flex-1">
-                            {licenseStatus.key}
+                            {licenseKey}
                           </code>
                           <button
-                            onClick={() => navigator.clipboard.writeText(licenseStatus.key!)}
+                            onClick={() => navigator.clipboard.writeText(licenseKey!)}
                             className="text-xs text-gray-400 hover:text-white px-2 py-1 bg-white/5 hover:bg-white/10 rounded transition-colors"
                           >
                             Copy
@@ -222,64 +212,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* Workspaces */}
-            {onWorkspacesChange && (
-              <div className="pt-4 border-t border-white/10">
-                <label className={`flex items-center justify-between cursor-pointer group ${!licenseStatus?.isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <div>
-                    <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
-                      <FolderOpen size={16} className="text-hector-green" />
-                      Local Workspaces
-                      {!licenseStatus?.isLicensed && (
-                        <span className="text-xs text-yellow-500 ml-2">(License required)</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      Run hector locally with managed workspaces
-                    </div>
+            <div className="pt-4 border-t border-white/10">
+              <label className={`flex items-center justify-between cursor-pointer group ${!licenseIsLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <div>
+                  <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
+                    <FolderOpen size={16} className="text-hector-green" />
+                    Local Workspaces
+                    {!licenseIsLicensed && (
+                      <span className="text-xs text-yellow-500 ml-2">(License required)</span>
+                    )}
                   </div>
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={workspacesEnabled}
-                      disabled={controlLoading || !licenseStatus?.isLicensed}
-                      onChange={async (e) => {
-                        const newValue = e.target.checked;
-                        try {
-                          if (newValue) {
-                            // Enable workspaces using centralized logic
-                            await enableAndSelect();
-                          } else {
-                            // Stop the local workspace
-                            await disableWorkspaces();
-                            await window.api.workspace.stop();
-
-                            // If active server is a local workspace, deselect it
-                            const activeServer = activeServerId ? servers[activeServerId] : null;
-                            if (activeServer?.config.isLocal) {
-                              // Find a remote server to select instead
-                              const remoteServer = Object.values(servers).find(s => !s.config.isLocal);
-                              if (remoteServer) {
-                                selectServer(remoteServer.config.id);
-                                await window.api.server.setActive(remoteServer.config.id);
-                              } else {
-                                // No remote servers, clear selection
-                                selectServer('');
-                              }
-                            }
-                          }
-                          onWorkspacesChange && onWorkspacesChange(newValue);
-                        } catch (error) {
-                          console.error('Failed to toggle workspaces:', error);
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    Run hector locally with managed workspaces
+                  </div>
+                </div>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={workspacesEnabled}
+                    disabled={controlLoading || !licenseIsLicensed}
+                    onChange={async (e) => {
+                      const newValue = e.target.checked;
+                      try {
+                        if (newValue) {
+                          // Enable workspaces using centralized logic
+                          await enableAndSelect();
+                        } else {
+                          // Disable workspaces - coordinator handles everything:
+                          // stops workspace, sets flag, broadcasts event
+                          // useStateInit will clear active server selection
+                          await disableWorkspaces();
                         }
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className={`w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all ${controlLoading ? 'opacity-50' : ''}`}></div>
-                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-                  </div>
-                </label>
-              </div>
-            )}
+                        // State updated via IPC events
+                      } catch (error) {
+                        console.error('Failed to toggle workspaces:', error);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className={`w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all ${controlLoading ? 'opacity-50' : ''}`}></div>
+                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Footer */}

@@ -6,6 +6,7 @@ interface ServersStore {
   // State
   servers: Record<string, ServerState>;
   activeServerId: string | null;
+  workspacesEnabled: boolean;
   
   // Accessors
   getActiveServer: () => ServerState | null;
@@ -22,6 +23,9 @@ interface ServersStore {
   setServerAgents: (id: string, agents: Agent[]) => void;
   setServerConfig: (id: string, yaml: string) => void;
   
+  // Workspaces
+  setWorkspacesEnabled: (enabled: boolean) => void;
+  
   // Sync with main process
   syncFromMain: (servers: ServerConfig[]) => void;
 }
@@ -31,10 +35,21 @@ export const useServersStore = create<ServersStore>()(
     (set, get) => ({
       servers: {},
       activeServerId: null,
+      workspacesEnabled: false,
       
       getActiveServer: () => {
-        const { servers, activeServerId } = get();
-        return activeServerId ? servers[activeServerId] : null;
+        const { servers, activeServerId, workspacesEnabled } = get();
+        if (!activeServerId) return null;
+        
+        const server = servers[activeServerId];
+        if (!server) return null;
+        
+        // Don't return local workspaces when the feature is disabled
+        if (server.config.isLocal && !workspacesEnabled) {
+          return null;
+        }
+        
+        return server;
       },
       
       addServer: (config: ServerConfig) => {
@@ -121,6 +136,10 @@ export const useServersStore = create<ServersStore>()(
             },
           };
         });
+      },
+      
+      setWorkspacesEnabled: (enabled: boolean) => {
+        set({ workspacesEnabled: enabled });
       },
       
       syncFromMain: (configs: ServerConfig[]) => {

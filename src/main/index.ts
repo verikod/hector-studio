@@ -8,11 +8,11 @@ import {
   checkForUpdates
 } from './hector/manager'
 import { serverManager } from './servers/manager'
+import { stateCoordinator } from './state/coordinator'
 import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { mkdirSync } from 'fs'
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -51,7 +51,7 @@ function createWindow(): BrowserWindow {
 }
 
 async function initializeApp(): Promise<void> {
-  // Only create and start workspaces if hector is installed
+  // Check for runtime updates
   let needsRuntimeUpdate = false
 
   if (isHectorInstalled()) {
@@ -65,36 +65,31 @@ async function initializeApp(): Promise<void> {
       console.error('[main] Failed to check for updates:', err)
     }
 
-    const servers = serverManager.getServers()
-
-    // Create default workspace if none exist
-    if (servers.filter(s => s.isLocal).length === 0) {
-      const documentsPath = app.getPath('documents')
-      const defaultPath = join(documentsPath, 'Hector', 'Default')
-      mkdirSync(defaultPath, { recursive: true })
-
-      console.log('[main] Creating default workspace:', defaultPath)
-      serverManager.addWorkspace('Default', defaultPath)
-    }
-
-    // Auto-start active workspace only if no update needed
+    // Auto-start active workspace only if:
+    // 1. No runtime update needed
+    // 2. Workspaces are enabled (will be validated by stateCoordinator)
     const activeWorkspace = serverManager.getActiveWorkspace()
-    if (activeWorkspace && !needsRuntimeUpdate) {
+    if (activeWorkspace && !needsRuntimeUpdate && serverManager.getWorkspacesEnabled()) {
       console.log(`[main] Auto-starting workspace: ${activeWorkspace.name}`)
       startWorkspace(activeWorkspace).catch(err => {
         console.error('[main] Failed to start workspace:', err)
       })
     }
   } else {
-    console.log('[main] Hector not installed, skipping workspace creation')
+    console.log('[main] Hector not installed, skipping workspace auto-start')
   }
 
-  // Notify renderer that app is ready with status info
+  // Use centralized state coordinator to validate and sync state
+  // This enforces business rules: license required for workspaces, etc.
+  const state = await stateCoordinator.validateAndSync()
+
+  // Also send app:ready for backwards compatibility (includes needsRuntimeUpdate)
   const readyPayload = {
-    hectorInstalled: isHectorInstalled(),
+    hectorInstalled: state.hectorInstalled,
     hasWorkspaces: serverManager.getServers().filter(s => s.isLocal).length > 0,
-    workspacesEnabled: serverManager.getWorkspacesEnabled(),
-    needsRuntimeUpdate
+    workspacesEnabled: state.workspacesEnabled,
+    needsRuntimeUpdate,
+    isLicensed: state.isLicensed
   }
   console.log('[main] App ready:', readyPayload)
   BrowserWindow.getAllWindows().forEach(win => {

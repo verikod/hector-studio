@@ -1,6 +1,7 @@
 import { Rocket, Settings, DownloadCloud, LayoutTemplate, MessageSquare, Split } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useServersStore } from '../store/serversStore';
+import { useLicenseStore } from '../store/licenseStore';
 import { ServerSelector } from './ServerSelector';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -19,13 +20,18 @@ interface UnifiedHeaderProps {
     onLoginRequest: (serverId: string) => void;
     onLogoutRequest: (serverId: string) => void;
     onOpenSettings: () => void;
-    workspacesEnabled: boolean;
     onEnableWorkspaces: () => void;
-    isLicensed: boolean;
+    // Deprecated props - kept for backwards compatibility but now using stores
+    workspacesEnabled?: boolean;
+    isLicensed?: boolean;
 }
 
-export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings, workspacesEnabled, onEnableWorkspaces, isLicensed }: UnifiedHeaderProps) {
+export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings, onEnableWorkspaces }: UnifiedHeaderProps) {
     const activeServer = useServersStore((s) => s.getActiveServer());
+
+    // Use stores directly for immediate sync
+    const workspacesEnabled = useServersStore((s) => s.workspacesEnabled);
+    const isLicensed = useLicenseStore((s) => s.isLicensed);
 
     // Studio State
     const studioViewMode = useStore((s) => s.studioViewMode);
@@ -109,9 +115,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings,
                 <ServerSelector
                     onLoginRequest={onLoginRequest}
                     onLogoutRequest={onLogoutRequest}
-                    workspacesEnabled={workspacesEnabled}
                     onEnableWorkspaces={onEnableWorkspaces}
-                    isLicensed={isLicensed}
                 />
             </div>
 

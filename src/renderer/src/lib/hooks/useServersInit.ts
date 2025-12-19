@@ -9,6 +9,7 @@ import type { ServerConfig, ServerStatus } from '../../types';
 export function useServersInit() {
   const syncFromMain = useServersStore((s) => s.syncFromMain);
   const setServerStatus = useServersStore((s) => s.setServerStatus);
+  const setWorkspacesEnabled = useServersStore((s) => s.setWorkspacesEnabled);
 
   useEffect(() => {
     // Initial load
@@ -60,7 +61,36 @@ export function useServersInit() {
       }
     };
 
-    loadServers();
+    // Load initial workspaces enabled state and validate active server
+    const loadWorkspacesEnabled = async () => {
+      try {
+        const enabled = await (window as any).api.workspaces.isEnabled();
+        setWorkspacesEnabled(enabled);
+        
+        // If workspaces are disabled, ensure we don't have a local workspace selected
+        // This handles the case where activeServerId was persisted in localStorage
+        if (!enabled) {
+          const { servers, activeServerId, selectServer } = useServersStore.getState();
+          const activeServer = activeServerId ? servers[activeServerId] : null;
+          
+          if (activeServer?.config.isLocal) {
+            console.log('[useServersInit] Clearing stale local workspace selection on startup');
+            const remoteServer = Object.values(servers).find(s => !s.config.isLocal);
+            if (remoteServer) {
+              selectServer(remoteServer.config.id);
+            } else {
+              selectServer('');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load workspaces enabled state:', error);
+      }
+    };
+
+    // Load sequentially: servers first, then workspaces state
+    // This ensures server list is available when validating active server
+    loadServers().then(() => loadWorkspacesEnabled());
 
     // Subscribe to updates
     const unsubServers = (window as any).api.server.onServersUpdated((servers: ServerConfig[]) => {
@@ -106,10 +136,14 @@ export function useServersInit() {
       }
     });
 
+    // NOTE: workspaces:enabled-changed event is now handled by useStateInit
+    // to avoid redundant state updates. This hook only handles initial load.
+
     return () => {
       unsubServers?.();
       unsubStatus?.();
       unsubAuth?.();
     };
-  }, [syncFromMain, setServerStatus]);
+  }, [syncFromMain, setServerStatus, setWorkspacesEnabled]);
 }
+

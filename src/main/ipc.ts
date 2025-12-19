@@ -3,6 +3,7 @@ import { join } from 'path'
 import { mkdirSync } from 'fs'
 import { serverManager } from './servers/manager'
 import { authManager } from './auth/manager'
+import { stateCoordinator } from './state/coordinator'
 import {
   isHectorInstalled,
   getInstalledVersion,
@@ -19,13 +20,10 @@ import {
 } from './hector/manager'
 import {
   validateLicenseOnline,
-  activateLicense,
   getCheckoutUrl
 } from './license/lemonsqueezy'
 import {
   getStoredLicense,
-  storeLicense,
-  removeLicense,
   getLicenseStatus,
   isOfflineValidationAllowed,
   updateLastValidated
@@ -111,57 +109,19 @@ export function registerIPCHandlers(): void {
     return workspace
   })
 
-  // Workspaces feature toggle
+  // Workspaces feature toggle - delegates to centralized stateCoordinator
   ipcMain.handle('workspaces:is-enabled', () => {
     return serverManager.getWorkspacesEnabled()
   })
 
   ipcMain.handle('workspaces:enable', async () => {
-    console.log('[ipc] Enabling workspaces...')
-
-    // Download hector if not installed
-    if (!isHectorInstalled()) {
-      console.log('[ipc] Downloading hector...')
-      await downloadHector()
-    }
-
-    // Get existing workspaces
-    const servers = serverManager.getServers()
-    const localWorkspaces = servers.filter(s => s.isLocal)
-
-    if (localWorkspaces.length === 0) {
-      // Create default workspace if no workspaces exist
-      const documentsPath = app.getPath('documents')
-      const defaultPath = join(documentsPath, 'Hector', 'Default')
-      mkdirSync(defaultPath, { recursive: true })
-
-      console.log('[ipc] Creating default workspace:', defaultPath)
-      const workspace = serverManager.addWorkspace('Default', defaultPath)
-
-      if (workspace) {
-        console.log('[ipc] Starting default workspace:', workspace.id)
-        await startWorkspace(workspace)
-      }
-    } else {
-      // Re-enabling: start the first existing workspace
-      const firstWorkspace = localWorkspaces[0]
-      console.log('[ipc] Re-enabling workspaces, starting:', firstWorkspace.id)
-      await startWorkspace(firstWorkspace)
-    }
-
-    // Enable workspaces feature
-    serverManager.setWorkspacesEnabled(true)
-    console.log('[ipc] Workspaces enabled')
-
-    const startedId = serverManager.getActiveWorkspace()?.id;
-
-    return { success: true, workspaceId: startedId }
+    console.log('[ipc] workspaces:enable -> delegating to stateCoordinator')
+    return stateCoordinator.enableWorkspaces()
   })
 
   ipcMain.handle('workspaces:disable', async () => {
-    console.log('[ipc] Disabling workspaces')
-    await stopWorkspace()
-    serverManager.setWorkspacesEnabled(false)
+    console.log('[ipc] workspaces:disable -> delegating to stateCoordinator')
+    await stateCoordinator.disableWorkspaces()
     return { success: true }
   })
 
@@ -226,19 +186,12 @@ export function registerIPCHandlers(): void {
   })
 
   ipcMain.handle('license:activate', async (_, key: string) => {
-    // First try to activate (increments activation count)
-    const activation = await activateLicense(key)
-    if (activation.valid && activation.license) {
-      storeLicense(key, activation.license.email, 'active')
-      return { success: true, license: activation.license }
+    console.log('[ipc] license:activate -> delegating to stateCoordinator')
+    const result = await stateCoordinator.activateLicense(key)
+    if (result.success) {
+      return { success: true, license: { email: result.state?.licenseEmail } }
     }
-    // If activation fails, try validation only
-    const validation = await validateLicenseOnline(key)
-    if (validation.valid && validation.license) {
-      storeLicense(key, validation.license.email, 'active')
-      return { success: true, license: validation.license }
-    }
-    return { success: false, error: validation.message }
+    return { success: false, error: result.error }
   })
 
   ipcMain.handle('license:validate', async () => {
@@ -262,8 +215,9 @@ export function registerIPCHandlers(): void {
     return { valid: false, reason: validation.message }
   })
 
-  ipcMain.handle('license:deactivate', () => {
-    removeLicense()
+  ipcMain.handle('license:deactivate', async () => {
+    console.log('[ipc] license:deactivate -> delegating to stateCoordinator')
+    await stateCoordinator.deactivateLicense()
     return { success: true }
   })
 

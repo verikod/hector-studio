@@ -6,6 +6,7 @@
  */
 
 import Store from 'electron-store'
+import { BrowserWindow } from 'electron'
 
 interface StoredLicense {
     key: string
@@ -46,6 +47,11 @@ export function storeLicense(key: string, email: string, status: StoredLicense['
         status
     })
     console.log('[license] Stored license for:', email)
+    
+    // Emit to all windows
+    BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('license:changed', { isLicensed: true, email, key })
+    })
 }
 
 /**
@@ -74,6 +80,11 @@ export function updateLicenseStatus(status: StoredLicense['status']): void {
 export function removeLicense(): void {
     store.delete('license')
     console.log('[license] License removed')
+    
+    // Emit to all windows
+    BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('license:changed', { isLicensed: false, email: null, key: null })
+    })
 }
 
 /**

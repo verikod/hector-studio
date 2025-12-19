@@ -41,7 +41,12 @@ const api = {
   workspaces: {
     isEnabled: () => ipcRenderer.invoke('workspaces:is-enabled'),
     enable: () => ipcRenderer.invoke('workspaces:enable'),
-    disable: () => ipcRenderer.invoke('workspaces:disable')
+    disable: () => ipcRenderer.invoke('workspaces:disable'),
+    onEnabledChanged: (callback: (enabled: boolean) => void) => {
+      const handler = (_: any, enabled: boolean) => callback(enabled)
+      ipcRenderer.on('workspaces:enabled-changed', handler)
+      return () => ipcRenderer.removeListener('workspaces:enabled-changed', handler)
+    }
   },
 
   // Auth Management
@@ -82,7 +87,12 @@ const api = {
     activate: (key: string) => ipcRenderer.invoke('license:activate', key),
     validate: () => ipcRenderer.invoke('license:validate'),
     deactivate: () => ipcRenderer.invoke('license:deactivate'),
-    getPortalUrl: () => ipcRenderer.invoke('license:portal-url')
+    getPortalUrl: () => ipcRenderer.invoke('license:portal-url'),
+    onLicenseChanged: (callback: (data: { isLicensed: boolean; email: string | null; key: string | null }) => void) => {
+      const handler = (_: any, data: any) => callback(data)
+      ipcRenderer.on('license:changed', handler)
+      return () => ipcRenderer.removeListener('license:changed', handler)
+    }
   },
 
   // App lifecycle
@@ -91,6 +101,12 @@ const api = {
       const handler = (_event: any, payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => callback(payload)
       ipcRenderer.on('app:ready', handler)
       return () => ipcRenderer.removeListener('app:ready', handler)
+    },
+    // Unified state change event from stateCoordinator
+    onStateChanged: (callback: (state: { isLicensed: boolean, licenseEmail: string | null, licenseKey: string | null, workspacesEnabled: boolean, hectorInstalled: boolean }) => void) => {
+      const handler = (_event: any, state: any) => callback(state)
+      ipcRenderer.on('app:state-changed', handler)
+      return () => ipcRenderer.removeListener('app:state-changed', handler)
     },
     checkUpdate: () => ipcRenderer.invoke('app:check-update'),
     startDownload: () => ipcRenderer.invoke('app:start-download'),

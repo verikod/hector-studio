@@ -9,23 +9,30 @@ export function useWorkspaceControl() {
   const enableAndSelect = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Enable in backend
+      // Call coordinator via IPC - it handles workspace creation, starting, and state sync
       const result = await (window as any).api.workspaces.enable();
-      const workspaceId = (result as any).workspaceId;
-
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to enable workspaces');
+      }
+      
+      const workspaceId = result.workspaceId;
       if (!workspaceId) {
         throw new Error('No workspace ID returned from enable');
       }
 
-      // 2. Force immediate sync of server list to get the new workspace in the store
+      // Sync server list to ensure the workspace is in our store
+      // The coordinator broadcasts state, but we need the full server list sync too
       const list = await (window as any).api.server.list();
       syncFromMain(list);
 
-      // 3. Select the new workspace
+      // Select the started workspace
       selectServer(workspaceId);
       
-      // 4. Ensure backend knows it's active (persistence)
+      // Persist selection
       await (window as any).api.server.setActive(workspaceId);
+
+      console.log('[useWorkspaceControl] Enable complete, selected workspace:', workspaceId);
 
       return workspaceId;
     } finally {

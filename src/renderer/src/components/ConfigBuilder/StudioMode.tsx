@@ -9,6 +9,7 @@ import { SettingsModal } from './SettingsModal';
 import { ConfigEditor } from './ConfigEditor';
 import { InfrastructureSidebar } from './InfrastructureSidebar';
 import { useStore } from '../../store/useStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { api } from '../../services/api';
 import { configureYamlSchema } from '../../lib/monaco';
 import { EDITOR } from '../../lib/constants';
@@ -41,14 +42,23 @@ export const StudioMode: React.FC = () => {
   const isDraggingRef = useRef(false);
 
   // Studio Mode Capability - from global store (set by App.tsx on server connect)
-  const isStudioModeEnabled = useStore((s) => s.isServerStudioEnabled);
+  const isServerStudioEnabled = useStore((s) => s.isServerStudioEnabled);
+
+  // License status from centralized store
+  const isLicensed = useLicenseStore((s) => s.isLicensed);
+
+  // Combine server capability and client license
+  const isStudioModeEnabled = isServerStudioEnabled && !!isLicensed;
 
   // Auto-collapse sidebar if studio mode disabled
   useEffect(() => {
     if (!isStudioModeEnabled) {
       setSidebarCollapsed(true);
+      if (viewMode !== 'chat') {
+        useStore.getState().setStudioViewMode('chat');
+      }
     }
-  }, [isStudioModeEnabled]);
+  }, [isStudioModeEnabled, viewMode]);
 
   // Resizable Panel Logic
   const startResizing = useCallback(() => {
@@ -186,7 +196,7 @@ export const StudioMode: React.FC = () => {
   // Load initial config (only if studio mode is enabled)
   const endpointUrl = useStore((state) => state.endpointUrl);
   useEffect(() => {
-    // Skip config fetch if studio mode is disabled (chat-only server)
+    // Skip config fetch if studio mode is disabled (chat-only server) or not licensed
     if (!isStudioModeEnabled) {
       setLoading(false);
       return;
@@ -225,7 +235,7 @@ export const StudioMode: React.FC = () => {
     initSchema();
   }, [isStudioModeEnabled]);
 
-  if (loading) {
+  if (loading && isStudioModeEnabled) {
     return (
       <div className="flex items-center justify-center h-full bg-gradient-to-br from-hector-darker to-black">
         <div className="text-white">Loading configuration...</div>

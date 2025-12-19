@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen, Terminal, ExternalLink } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
+import { useLicenseStore } from '../store/licenseStore';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -18,23 +19,28 @@ import type { ServerState } from '../types';
 interface ServerSelectorProps {
     onLoginRequest: (serverId: string) => void;
     onLogoutRequest: (serverId: string) => void;
-    workspacesEnabled: boolean;
     onEnableWorkspaces: () => void;
-    isLicensed: boolean;
+    // Deprecated props - kept for backwards compatibility but now using stores
+    workspacesEnabled?: boolean;
+    isLicensed?: boolean;
 }
 
-export function ServerSelector({ onLoginRequest, onLogoutRequest, workspacesEnabled, onEnableWorkspaces, isLicensed }: ServerSelectorProps) {
+export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorkspaces }: ServerSelectorProps) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [newName, setNewName] = useState('');
     const [newUrl, setNewUrl] = useState('');
     const [isOpen, setIsOpen] = useState(false);
 
+    // Use stores directly for immediate sync
+    const workspacesEnabled = useServersStore((s) => s.workspacesEnabled);
+    const isLicensed = useLicenseStore((s) => s.isLicensed);
+
     const servers = useServersStore((s) => s.servers);
     const activeServerId = useServersStore((s) => s.activeServerId);
     const selectServer = useServersStore((s) => s.selectServer);
     const removeServer = useServersStore((s) => s.removeServer);
-
-    const activeServer = activeServerId ? servers[activeServerId] : null;
+    // Use getActiveServer() which filters out local workspaces when disabled
+    const activeServer = useServersStore((s) => s.getActiveServer());
     // Filter out local workspaces when workspaces feature is disabled
     const serverList = Object.values(servers).filter(s =>
         workspacesEnabled || !s.config.isLocal

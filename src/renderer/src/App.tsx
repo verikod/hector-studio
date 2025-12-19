@@ -6,8 +6,11 @@ import { ErrorDisplay } from "./components/ErrorDisplay";
 import { SuccessDisplay } from "./components/SuccessDisplay";
 import { useStore } from "./store/useStore";
 import { useServersStore } from "./store/serversStore";
+import { useLicenseStore } from "./store/licenseStore";
 import { useServersInit } from "./lib/hooks/useServersInit";
 import { useHealthPolling } from "./lib/hooks/useHealthPolling";
+import { useLicenseInit } from "./lib/hooks/useLicenseInit";
+import { useStateInit } from "./lib/hooks/useStateInit";
 import { UnifiedHeader } from "./components/UnifiedHeader";
 import { CoverOverlay } from "./components/CoverOverlay";
 import { LoginModal } from "./components/LoginModal";
@@ -25,29 +28,36 @@ type AppState = 'initializing' | 'needs_download' | 'needs_update' | 'downloadin
 function App() {
   // App lifecycle state machine
   const [appState, setAppState] = useState<AppState>('initializing');
-  // Whether workspaces feature is enabled (user opted in)
-  const [workspacesEnabled, setWorkspacesEnabled] = useState(false);
+
+  // Centralized state from stores
+  const workspacesEnabled = useServersStore((s) => s.workspacesEnabled);
+  const setWorkspacesEnabled = useServersStore((s) => s.setWorkspacesEnabled);
+  const isLicensed = useLicenseStore((s) => s.isLicensed);
+
+  // Initialize license state from main process
+  useLicenseInit();
+
+  // Subscribe to unified state changes from stateCoordinator
+  useStateInit();
 
   // Listen for app:ready event from main process
   useEffect(() => {
     const unsubscribe = window.api.app.onReady((payload) => {
       console.log('[App] Received app:ready:', payload);
+      // Sync initial workspaces state (also happens in useServersInit, but this is faster)
       setWorkspacesEnabled(payload.workspacesEnabled);
 
       // Determine initial app state
       if (payload.workspacesEnabled && !payload.hectorInstalled) {
-        // Workspaces enabled but hector missing - shouldn't happen normally
-        // Workspaces enabled but hector missing - shouldn't happen normally
         setAppState('needs_download');
       } else if (payload.needsRuntimeUpdate) {
         setAppState('needs_update');
       } else {
-        // Either workspaces disabled (remote-only) or all good
         setAppState('ready');
       }
     });
     return unsubscribe;
-  }, []);
+  }, [setWorkspacesEnabled]);
 
   // State for enable workspaces modal
   const [showEnableWorkspacesModal, setShowEnableWorkspacesModal] = useState(false);
@@ -58,15 +68,12 @@ function App() {
   };
 
   // Called when wizard completes successfully
-  // Called when wizard completes successfully
   const handleEnableWorkspacesComplete = async (workspaceId?: string) => {
-    setWorkspacesEnabled(true);
     setShowEnableWorkspacesModal(false);
+    // Store is updated via IPC event from useServersInit
 
     // Explicitly select the workspace that was just started
     if (workspaceId) {
-      // Ensure the store knows about the new workspace before selecting
-      // Race condition fix: fetch list immediately
       try {
         const servers = await window.api.server.list();
         useServersStore.getState().syncFromMain(servers);
@@ -82,7 +89,7 @@ function App() {
     setAppState('downloading');
     try {
       await window.api.workspaces.enable();
-      setWorkspacesEnabled(true);
+      // Store is updated via IPC event
       setAppState('ready');
     } catch (error) {
       console.error('Download failed:', error);
@@ -118,20 +125,13 @@ function App() {
   const [editorTheme, setEditorTheme] = useState<'vs-dark' | 'vs-light' | 'hc-black'>('hc-black');
   const [showLogDrawer, setShowLogDrawer] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
-  const [isLicensed, setIsLicensed] = useState<boolean | null>(null); // null = checking
 
-  // Check license status on mount and show modal if unlicensed
+  // Show license modal on app launch if not licensed (after initial check)
   useEffect(() => {
-    window.api.license.getStatus().then((status) => {
-      console.log('[App] License status:', status.isLicensed ? 'licensed' : 'unlicensed');
-      setIsLicensed(status.isLicensed);
-
-      // Show license modal on app launch if not licensed
-      if (!status.isLicensed) {
-        setShowLicenseModal(true);
-      }
-    });
-  }, []);
+    if (isLicensed === false) {
+      setShowLicenseModal(true);
+    }
+  }, [isLicensed]);
 
   // Expose license status for debugging
   useEffect(() => {
@@ -273,9 +273,7 @@ function App() {
         onLoginRequest={handleLoginRequest}
         onLogoutRequest={handleLogoutRequest}
         onOpenSettings={() => setShowSettings(true)}
-        workspacesEnabled={workspacesEnabled}
         onEnableWorkspaces={handleEnableWorkspaces}
-        isLicensed={!!isLicensed}
       />
 
       {/* Main Content - flex-1 with min-h-0 to allow shrinking */}
@@ -338,9 +336,8 @@ function App() {
         editorTheme={editorTheme}
         onThemeChange={setEditorTheme}
         workspacesEnabled={workspacesEnabled}
-        onWorkspacesChange={setWorkspacesEnabled}
         onLicenseDeactivated={() => {
-          setIsLicensed(false);
+          // License state updated via IPC event in useLicenseInit
           setShowLicenseModal(true);
         }}
         isLicensed={!!isLicensed}
@@ -361,7 +358,7 @@ function App() {
         isOpen={showLicenseModal}
         onClose={() => setShowLicenseModal(false)}
         onLicenseActivated={() => {
-          setIsLicensed(true);
+          // License state updated via IPC event in useLicenseInit
           setShowLicenseModal(false);
         }}
         onSkip={() => {
