@@ -26,9 +26,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const streamingEnabled = useStore((state) => state.streamingEnabled);
   const setStreamingEnabled = useStore((state) => state.setStreamingEnabled);
-  const [workspacesLoading, setWorkspacesLoading] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<{ isLicensed: boolean; email: string | null; key: string | null } | null>(null);
   const [deactivating, setDeactivating] = useState(false);
+
+  const { enableAndSelect, disableWorkspaces, isLoading: controlLoading } = useWorkspaceControl();
 
   const servers = useServersStore((s) => s.servers);
   const activeServerId = useServersStore((s) => s.activeServerId);
@@ -231,10 +232,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <input
                       type="checkbox"
                       checked={workspacesEnabled}
-                      disabled={workspacesLoading || !licenseStatus?.isLicensed}
+                      disabled={controlLoading || !licenseStatus?.isLicensed}
                       onChange={async (e) => {
                         const newValue = e.target.checked;
-                        setWorkspacesLoading(true);
                         try {
                           if (newValue) {
                             // Enable workspaces using centralized logic
@@ -258,16 +258,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               }
                             }
                           }
-                          onWorkspacesChange(newValue);
+                          onWorkspacesChange && onWorkspacesChange(newValue);
                         } catch (error) {
                           console.error('Failed to toggle workspaces:', error);
-                        } finally {
-                          setWorkspacesLoading(false);
                         }
                       }}
                       className="sr-only peer"
                     />
-                    <div className={`w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all ${workspacesLoading ? 'opacity-50' : ''}`}></div>
+                    <div className={`w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all ${controlLoading ? 'opacity-50' : ''}`}></div>
                     <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
                   </div>
                 </label>
