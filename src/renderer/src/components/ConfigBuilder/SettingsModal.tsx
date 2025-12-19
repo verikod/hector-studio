@@ -238,13 +238,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         try {
                           if (newValue) {
                             // Enable workspaces - backend will start the workspace
-                            await window.api.workspaces.enable();
+                            const result = await window.api.workspaces.enable();
 
-                            // Select the first local workspace in the UI
-                            const localWorkspace = Object.values(servers).find(s => s.config.isLocal);
-                            if (localWorkspace) {
-                              selectServer(localWorkspace.config.id);
-                              await window.api.server.setActive(localWorkspace.config.id);
+                            // Explicitly select the workspace that was just started
+                            if ((result as any).workspaceId) {
+                              const workspaceId = (result as any).workspaceId;
+                              // Force sync first to ensure store has the ID
+                              try {
+                                const list = await window.api.server.list();
+                                useServersStore.getState().syncFromMain(list);
+                                selectServer(workspaceId);
+                                await window.api.server.setActive(workspaceId);
+                              } catch (e) {
+                                console.error('Failed to sync/select after enable in settings:', e);
+                              }
+                            } else {
+                              // Fallback (shouldn't happen with new backend)
+                              const localWorkspace = Object.values(servers).find(s => s.config.isLocal);
+                              if (localWorkspace) {
+                                selectServer(localWorkspace.config.id);
+                                await window.api.server.setActive(localWorkspace.config.id);
+                              }
                             }
                           } else {
                             // Stop the local workspace
