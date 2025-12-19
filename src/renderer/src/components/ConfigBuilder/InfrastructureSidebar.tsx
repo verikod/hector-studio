@@ -6,6 +6,8 @@ import { parseConfig, updateConfigSection, removeFromConfigSection } from '../..
 import type { LLMConfig, ToolConfig, GuardrailConfig, DatabaseConfig, EmbedderConfig, VectorStoreConfig, DocumentStoreConfig } from '../../lib/config-utils';
 import { LLMModal } from './LLMModal';
 import { ToolModal } from './ToolModal';
+import { GuardrailModal } from './GuardrailModal';
+import { DatabaseModal, EmbedderModal, VectorStoreModal, DocumentStoreModal } from './OtherModals';
 import { useStore } from '../../store/useStore';
 
 interface InfrastructureSidebarProps {
@@ -119,8 +121,19 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
   // Modal states
   const [llmModalOpen, setLlmModalOpen] = useState(false);
   const [toolModalOpen, setToolModalOpen] = useState(false);
+  const [guardrailModalOpen, setGuardrailModalOpen] = useState(false);
+  const [databaseModalOpen, setDatabaseModalOpen] = useState(false);
+  const [embedderModalOpen, setEmbedderModalOpen] = useState(false);
+  const [vectorStoreModalOpen, setVectorStoreModalOpen] = useState(false);
+  const [documentStoreModalOpen, setDocumentStoreModalOpen] = useState(false);
+
   const [editingLLM, setEditingLLM] = useState<{ id: string; config: LLMConfig } | null>(null);
   const [editingTool, setEditingTool] = useState<{ id: string; config: ToolConfig } | null>(null);
+  const [editingGuardrail, setEditingGuardrail] = useState<{ id: string; config: GuardrailConfig } | null>(null);
+  const [editingDatabase, setEditingDatabase] = useState<{ id: string; config: DatabaseConfig } | null>(null);
+  const [editingEmbedder, setEditingEmbedder] = useState<{ id: string; config: EmbedderConfig } | null>(null);
+  const [editingVectorStore, setEditingVectorStore] = useState<{ id: string; config: VectorStoreConfig } | null>(null);
+  const [editingDocumentStore, setEditingDocumentStore] = useState<{ id: string; config: DocumentStoreConfig } | null>(null);
 
   const infrastructure = useMemo(() => {
     try {
@@ -210,26 +223,110 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
     setYamlContent(newYaml);
   }, [yamlContent, setYamlContent]);
 
-  // Placeholder handlers for other resource types (to be implemented)
+  // Handlers for Guardrails
   const handleAddGuardrail = useCallback(() => {
-    console.log('Add guardrail - coming soon');
+    setEditingGuardrail(null);
+    setGuardrailModalOpen(true);
   }, []);
 
+  const handleEditGuardrail = useCallback((id: string, config: GuardrailConfig) => {
+    setEditingGuardrail({ id, config });
+    setGuardrailModalOpen(true);
+  }, []);
+
+  const handleDeleteGuardrail = useCallback((id: string) => {
+    const newYaml = removeFromConfigSection(yamlContent, 'guardrails', id);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  const handleSaveGuardrail = useCallback((id: string, config: GuardrailConfig) => {
+    const newYaml = updateConfigSection(yamlContent, 'guardrails', id, config);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  // Handlers for Databases
   const handleAddDatabase = useCallback(() => {
-    console.log('Add database - coming soon');
+    setEditingDatabase(null);
+    setDatabaseModalOpen(true);
   }, []);
 
+  const handleEditDatabase = useCallback((id: string, config: DatabaseConfig) => {
+    setEditingDatabase({ id, config });
+    setDatabaseModalOpen(true);
+  }, []);
+
+  const handleDeleteDatabase = useCallback((id: string) => {
+    const newYaml = removeFromConfigSection(yamlContent, 'databases', id);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  const handleSaveDatabase = useCallback((id: string, config: DatabaseConfig) => {
+    const newYaml = updateConfigSection(yamlContent, 'databases', id, config);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  // Handlers for Embedders
   const handleAddEmbedder = useCallback(() => {
-    console.log('Add embedder - coming soon');
+    setEditingEmbedder(null);
+    setEmbedderModalOpen(true);
   }, []);
 
+  const handleEditEmbedder = useCallback((id: string, config: EmbedderConfig) => {
+    setEditingEmbedder({ id, config });
+    setEmbedderModalOpen(true);
+  }, []);
+
+  const handleDeleteEmbedder = useCallback((id: string) => {
+    const newYaml = removeFromConfigSection(yamlContent, 'embedders', id);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  const handleSaveEmbedder = useCallback((id: string, config: EmbedderConfig) => {
+    const newYaml = updateConfigSection(yamlContent, 'embedders', id, config);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  // Handlers for Vector Stores
   const handleAddVectorStore = useCallback(() => {
-    console.log('Add vector store - coming soon');
+    setEditingVectorStore(null);
+    setVectorStoreModalOpen(true);
   }, []);
 
-  const handleAddDocumentStore = useCallback(() => {
-    console.log('Add document store - coming soon');
+  const handleEditVectorStore = useCallback((id: string, config: VectorStoreConfig) => {
+    setEditingVectorStore({ id, config });
+    setVectorStoreModalOpen(true);
   }, []);
+
+  const handleDeleteVectorStore = useCallback((id: string) => {
+    const newYaml = removeFromConfigSection(yamlContent, 'vector_stores', id);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  const handleSaveVectorStore = useCallback((id: string, config: VectorStoreConfig) => {
+    const newYaml = updateConfigSection(yamlContent, 'vector_stores', id, config);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  // Handlers for Document Stores
+  const handleAddDocumentStore = useCallback(() => {
+    setEditingDocumentStore(null);
+    setDocumentStoreModalOpen(true);
+  }, []);
+
+  const handleEditDocumentStore = useCallback((id: string, config: DocumentStoreConfig) => {
+    setEditingDocumentStore({ id, config });
+    setDocumentStoreModalOpen(true);
+  }, []);
+
+  const handleDeleteDocumentStore = useCallback((id: string) => {
+    const newYaml = removeFromConfigSection(yamlContent, 'document_stores', id);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
+
+  const handleSaveDocumentStore = useCallback((id: string, config: DocumentStoreConfig) => {
+    const newYaml = updateConfigSection(yamlContent, 'document_stores', id, config);
+    setYamlContent(newYaml);
+  }, [yamlContent, setYamlContent]);
 
   if (collapsed) {
     return (
@@ -360,8 +457,8 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
                     name={name}
                     config={config as GuardrailConfig}
                     color="text-red-300"
-                    onEdit={() => console.log('Edit guardrail:', name)}
-                    onDelete={() => console.log('Delete guardrail:', name)}
+                    onEdit={() => handleEditGuardrail(name, config as GuardrailConfig)}
+                    onDelete={() => handleDeleteGuardrail(name)}
                   />
                 ))}
                 {Object.keys(infrastructure.guardrails).length === 0 && (
@@ -391,8 +488,8 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
                     name={name}
                     config={config as DatabaseConfig}
                     color="text-green-300"
-                    onEdit={() => console.log('Edit database:', name)}
-                    onDelete={() => console.log('Delete database:', name)}
+                    onEdit={() => handleEditDatabase(name, config as DatabaseConfig)}
+                    onDelete={() => handleDeleteDatabase(name)}
                   />
                 ))}
                 {Object.keys(infrastructure.databases).length === 0 && (
@@ -422,8 +519,8 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
                     name={name}
                     config={config as EmbedderConfig}
                     color="text-purple-300"
-                    onEdit={() => console.log('Edit embedder:', name)}
-                    onDelete={() => console.log('Delete embedder:', name)}
+                    onEdit={() => handleEditEmbedder(name, config as EmbedderConfig)}
+                    onDelete={() => handleDeleteEmbedder(name)}
                   />
                 ))}
                 {Object.keys(infrastructure.embedders).length === 0 && (
@@ -453,8 +550,8 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
                     name={name}
                     config={config as VectorStoreConfig}
                     color="text-orange-300"
-                    onEdit={() => console.log('Edit vector store:', name)}
-                    onDelete={() => console.log('Delete vector store:', name)}
+                    onEdit={() => handleEditVectorStore(name, config as VectorStoreConfig)}
+                    onDelete={() => handleDeleteVectorStore(name)}
                   />
                 ))}
                 {Object.keys(infrastructure.vectorStores).length === 0 && (
@@ -484,8 +581,8 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
                     name={name}
                     config={config as DocumentStoreConfig}
                     color="text-cyan-300"
-                    onEdit={() => console.log('Edit document store:', name)}
-                    onDelete={() => console.log('Delete document store:', name)}
+                    onEdit={() => handleEditDocumentStore(name, config as DocumentStoreConfig)}
+                    onDelete={() => handleDeleteDocumentStore(name)}
                   />
                 ))}
                 {Object.keys(infrastructure.documentStores).length === 0 && (
@@ -514,6 +611,53 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
         existingIds={Object.keys(infrastructure.tools)}
         editId={editingTool?.id}
         editConfig={editingTool?.config}
+      />
+
+      <GuardrailModal
+        isOpen={guardrailModalOpen}
+        onClose={() => { setGuardrailModalOpen(false); setEditingGuardrail(null); }}
+        onSave={handleSaveGuardrail}
+        existingIds={Object.keys(infrastructure.guardrails)}
+        editId={editingGuardrail?.id}
+        editConfig={editingGuardrail?.config}
+      />
+
+      <DatabaseModal
+        isOpen={databaseModalOpen}
+        onClose={() => { setDatabaseModalOpen(false); setEditingDatabase(null); }}
+        onSave={handleSaveDatabase}
+        existingIds={Object.keys(infrastructure.databases)}
+        editId={editingDatabase?.id}
+        editConfig={editingDatabase?.config}
+      />
+
+      <EmbedderModal
+        isOpen={embedderModalOpen}
+        onClose={() => { setEmbedderModalOpen(false); setEditingEmbedder(null); }}
+        onSave={handleSaveEmbedder}
+        existingIds={Object.keys(infrastructure.embedders)}
+        editId={editingEmbedder?.id}
+        editConfig={editingEmbedder?.config}
+      />
+
+      <VectorStoreModal
+        isOpen={vectorStoreModalOpen}
+        onClose={() => { setVectorStoreModalOpen(false); setEditingVectorStore(null); }}
+        onSave={handleSaveVectorStore}
+        existingIds={Object.keys(infrastructure.vectorStores)}
+        editId={editingVectorStore?.id}
+        editConfig={editingVectorStore?.config}
+      />
+
+      <DocumentStoreModal
+        isOpen={documentStoreModalOpen}
+        onClose={() => { setDocumentStoreModalOpen(false); setEditingDocumentStore(null); }}
+        onSave={handleSaveDocumentStore}
+        existingIds={Object.keys(infrastructure.documentStores)}
+        embedderOptions={Object.keys(infrastructure.embedders)}
+        vectorStoreOptions={Object.keys(infrastructure.vectorStores)}
+        editId={editingDocumentStore?.id}
+        editConfig={editingDocumentStore?.config}
       />
     </>
   );

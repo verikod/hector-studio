@@ -107,14 +107,23 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         </div>
 
-        {/* Type badge */}
-        <div className="flex items-center gap-2">
-          <span className={`px-2 py-1 text-xs font-medium rounded ${isWorkflow ? 'bg-purple-500/20 text-purple-300' :
-              isRemote ? 'bg-amber-500/20 text-amber-300' :
-                'bg-hector-green/20 text-hector-green'
-            }`}>
-            {agentType.toUpperCase()}
-          </span>
+        {/* Agent Type selector */}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Agent Type
+          </label>
+          <select
+            value={agentType}
+            onChange={(e) => handleChange('agentType', e.target.value)}
+            disabled={readonly}
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+          >
+            <option value="llm">LLM Agent</option>
+            <option value="sequential">Sequential Workflow</option>
+            <option value="parallel">Parallel Workflow</option>
+            <option value="loop">Loop Workflow</option>
+            <option value="remote">Remote Agent</option>
+          </select>
         </div>
 
         {/* Basic Info Section */}

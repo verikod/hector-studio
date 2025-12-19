@@ -162,11 +162,13 @@ export const CanvasMode: React.FC<CanvasModeProps> = ({ yamlContent }) => {
         )}
       </div>
 
-      {/* Agent count indicator */}
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-2 bg-black/40 rounded-lg border border-white/10">
-        <Bot size={16} className="text-hector-green" />
-        <span className="text-sm text-gray-300">{nodes.length} agents</span>
-      </div>
+      {/* Agent count indicator - lower z-index to not overlap properties panel */}
+      {!selectedNodeId && (
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-2 bg-black/40 rounded-lg border border-white/10">
+          <Bot size={16} className="text-hector-green" />
+          <span className="text-sm text-gray-300">{nodes.length} agents</span>
+        </div>
+      )}
 
       {/* Main Canvas */}
       <div className="flex-1 relative">
@@ -200,7 +202,7 @@ export const CanvasMode: React.FC<CanvasModeProps> = ({ yamlContent }) => {
             style={{ backgroundColor: "#111" }}
           />
           <Controls
-            className="bg-black/40 border border-white/10 rounded-lg"
+            className="!bg-black/60 !border !border-white/10 !rounded-lg !shadow-lg [&>button]:!bg-black/40 [&>button]:!border-white/10 [&>button]:!text-gray-300 [&>button:hover]:!bg-white/10"
             showInteractive={false}
           />
           <MiniMap
