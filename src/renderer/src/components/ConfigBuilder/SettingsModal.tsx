@@ -3,6 +3,9 @@ import { X, Monitor, RefreshCw, FolderOpen, Key, Trash2 } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import { useServersStore } from "../../store/serversStore";
 
+import { useWorkspaceControl } from "../../lib/hooks/useWorkspaceControl";
+import { useLicenseControl } from "../../lib/hooks/useLicenseControl";
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,7 +30,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const streamingEnabled = useStore((state) => state.streamingEnabled);
   const setStreamingEnabled = useStore((state) => state.setStreamingEnabled);
   const [licenseStatus, setLicenseStatus] = useState<{ isLicensed: boolean; email: string | null; key: string | null } | null>(null);
-  const [deactivating, setDeactivating] = useState(false);
 
   const { enableAndSelect, disableWorkspaces, isLoading: controlLoading } = useWorkspaceControl();
 
@@ -35,19 +37,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const activeServerId = useServersStore((s) => s.activeServerId);
   const selectServer = useServersStore((s) => s.selectServer);
 
+  const { deactivate, getStatus, isLoading: licenseLoading } = useLicenseControl();
+
   // Fetch license status when modal opens or license state changes
   useEffect(() => {
     if (isOpen) {
-      window.api.license.getStatus().then(setLicenseStatus);
+      getStatus().then(setLicenseStatus);
     }
-  }, [isOpen, isLicensed]);
+  }, [isOpen, isLicensed, getStatus]);
 
   const handleDeactivate = async () => {
-    setDeactivating(true);
-    await window.api.license.deactivate();
-    setLicenseStatus({ isLicensed: false, email: null, key: null });
-    setDeactivating(false);
-    onLicenseDeactivated?.();
+    // No local loading state needed, hook handles it? 
+    // Actually we need to reflect it in the button.
+    // And calling deactivate() handles the API.
+    try {
+      await deactivate();
+      setLicenseStatus({ isLicensed: false, email: null, key: null });
+      onLicenseDeactivated?.();
+    } catch (e) {
+      // Error handled in hook or ignored here
+    }
   };
 
   if (!isOpen) return null;
@@ -193,11 +202,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <button
                     onClick={handleDeactivate}
-                    disabled={deactivating}
+                    disabled={licenseLoading}
                     className="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors flex items-center justify-center gap-2"
                   >
                     <Trash2 size={14} />
-                    {deactivating ? 'Deactivating...' : 'Deactivate License'}
+                    {licenseLoading ? 'Deactivating...' : 'Deactivate License'}
                   </button>
                 </div>
               ) : (
