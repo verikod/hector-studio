@@ -41,7 +41,16 @@ export function initializeUpdater() {
 
     autoUpdater.on('error', (err) => {
         console.error('[updater] Error in auto-updater:', err)
-        broadcastStatus('error', err.message)
+
+        // Provide more specific error messages for common issues
+        let errorMessage = err.message
+        if (err.message.includes('Code signature')) {
+            errorMessage = 'Update failed: Code signing validation error. Please download the latest version manually from GitHub.'
+        } else if (err.message.includes('EACCES') || err.message.includes('permission')) {
+            errorMessage = 'Update failed: Permission denied. Try restarting the app with admin privileges.'
+        }
+
+        broadcastStatus('error', errorMessage)
     })
 
     autoUpdater.on('download-progress', (progressObj) => {
