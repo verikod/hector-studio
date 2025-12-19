@@ -153,7 +153,9 @@ export function registerIPCHandlers(): void {
     serverManager.setWorkspacesEnabled(true)
     console.log('[ipc] Workspaces enabled')
 
-    return { success: true }
+    const startedId = serverManager.getActiveWorkspace()?.id;
+
+    return { success: true, workspaceId: startedId }
   })
 
   ipcMain.handle('workspaces:disable', async () => {

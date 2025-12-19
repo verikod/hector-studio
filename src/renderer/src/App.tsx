@@ -58,9 +58,14 @@ function App() {
   };
 
   // Called when wizard completes successfully
-  const handleEnableWorkspacesComplete = () => {
+  const handleEnableWorkspacesComplete = (workspaceId?: string) => {
     setWorkspacesEnabled(true);
     setShowEnableWorkspacesModal(false);
+
+    // Explicitly select the workspace that was just started
+    if (workspaceId) {
+      useServersStore.getState().selectServer(workspaceId);
+    }
   };
 
   // Handle hector download from WelcomeCover (shows splash progress)

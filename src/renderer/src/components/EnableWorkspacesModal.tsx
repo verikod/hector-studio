@@ -7,7 +7,7 @@ type EnableStage = 'consent' | 'downloading' | 'creating' | 'starting' | 'comple
 interface EnableWorkspacesModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onComplete: () => void;
+    onComplete: (workspaceId?: string) => void;
 }
 
 /**
@@ -40,7 +40,7 @@ export const EnableWorkspacesModal: React.FC<EnableWorkspacesModalProps> = ({
 
             // Stage 3: Starting
             setStage('starting');
-            await window.api.workspaces.enable();
+            const result = await window.api.workspaces.enable();
 
             // Give time for status change events to propagate
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -49,8 +49,9 @@ export const EnableWorkspacesModal: React.FC<EnableWorkspacesModalProps> = ({
             setStage('complete');
 
             // Auto-close after brief delay
+            // Pass the workspaceId back to the parent
             setTimeout(() => {
-                onComplete();
+                onComplete((result as any).workspaceId);
             }, 1000);
 
         } catch (error) {
