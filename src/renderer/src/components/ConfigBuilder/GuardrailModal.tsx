@@ -34,7 +34,17 @@ export const GuardrailModal: React.FC<GuardrailModalProps> = ({
     const [outputPII, setOutputPII] = useState(false);
     const [detectEmail, setDetectEmail] = useState(true);
     const [detectPhone, setDetectPhone] = useState(true);
+
+
     const [redactMode, setRedactMode] = useState('mask');
+    const [outputContent, setOutputContent] = useState(false);
+    const [blockedKeywords, setBlockedKeywords] = useState('');
+    const [blockedPatterns, setBlockedPatterns] = useState('');
+
+    // Tool Authorization
+    const [toolAuth, setToolAuth] = useState(false);
+    const [allowedTools, setAllowedTools] = useState('');
+    const [blockedTools, setBlockedTools] = useState('');
 
     useEffect(() => {
         if (isOpen) {
@@ -46,9 +56,14 @@ export const GuardrailModal: React.FC<GuardrailModalProps> = ({
                 setInputInjection(editConfig.input?.injection?.enabled || false);
                 setInputSanitizer(editConfig.input?.sanitizer?.enabled || false);
                 setOutputPII(editConfig.output?.pii?.enabled || false);
-                setDetectEmail(editConfig.output?.pii?.detect_email !== false);
                 setDetectPhone(editConfig.output?.pii?.detect_phone !== false);
                 setRedactMode(editConfig.output?.pii?.redact_mode || 'mask');
+                setOutputContent(editConfig.output?.content?.enabled || false);
+                setBlockedKeywords(editConfig.output?.content?.blocked_keywords?.join(', ') || '');
+                setBlockedPatterns(editConfig.output?.content?.blocked_patterns?.join(', ') || '');
+                setToolAuth(editConfig.tool?.enabled || false);
+                setAllowedTools(editConfig.tool?.allowed_tools?.join(', ') || '');
+                setBlockedTools(editConfig.tool?.blocked_tools?.join(', ') || '');
             } else {
                 setId('');
                 setEnabled(true);
@@ -60,6 +75,12 @@ export const GuardrailModal: React.FC<GuardrailModalProps> = ({
                 setDetectEmail(true);
                 setDetectPhone(true);
                 setRedactMode('mask');
+                setOutputContent(false);
+                setBlockedKeywords('');
+                setBlockedPatterns('');
+                setToolAuth(false);
+                setAllowedTools('');
+                setBlockedTools('');
             }
         }
     }, [isOpen, isEditing, editId, editConfig]);
@@ -85,15 +106,32 @@ export const GuardrailModal: React.FC<GuardrailModalProps> = ({
             }
         }
 
-        // Build output object if PII enabled
-        if (outputPII) {
-            config.output = {
-                pii: {
+        if (outputPII || outputContent) {
+            config.output = {};
+
+            if (outputPII) {
+                config.output.pii = {
                     enabled: true,
                     detect_email: detectEmail,
                     detect_phone: detectPhone,
                     redact_mode: redactMode,
-                },
+                };
+            }
+
+            if (outputContent) {
+                config.output.content = {
+                    enabled: true,
+                    blocked_keywords: blockedKeywords ? blockedKeywords.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+                    blocked_patterns: blockedPatterns ? blockedPatterns.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+                };
+            }
+        }
+
+        if (toolAuth) {
+            config.tool = {
+                enabled: true,
+                allowed_tools: allowedTools ? allowedTools.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+                blocked_tools: blockedTools ? blockedTools.split(',').map(s => s.trim()).filter(Boolean) : undefined,
             };
         }
 
@@ -196,6 +234,66 @@ export const GuardrailModal: React.FC<GuardrailModalProps> = ({
                                         { value: 'remove', label: 'Remove' },
                                         { value: 'hash', label: 'Hash' },
                                     ]}
+                                />
+                            </FormField>
+                        </>
+
+                    )}
+
+                    <ToggleInput
+                        checked={outputContent}
+                        onChange={setOutputContent}
+                        label="Content filtering"
+                    />
+
+                    {outputContent && (
+                        <>
+                            <FormField label="Blocked Keywords" hint="Comma-separated">
+                                <TextInput
+                                    value={blockedKeywords}
+                                    onChange={setBlockedKeywords}
+                                    placeholder="password, secret, internal"
+                                />
+                            </FormField>
+                            <FormField label="Blocked Patterns" hint="Regex patterns (comma-separated)">
+                                <TextInput
+                                    value={blockedPatterns}
+                                    onChange={setBlockedPatterns}
+                                    placeholder="sk-[a-zA-Z0-9]+"
+                                />
+                            </FormField>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Tool Authorization */}
+            <div className="pt-2 border-t border-white/10">
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+                    Tool Authorization
+                </div>
+
+                <div className="space-y-3">
+                    <ToggleInput
+                        checked={toolAuth}
+                        onChange={setToolAuth}
+                        label="Enable tool authorization"
+                    />
+
+                    {toolAuth && (
+                        <>
+                            <FormField label="Allowed Tools" hint="Whitelist (comma-separated)">
+                                <TextInput
+                                    value={allowedTools}
+                                    onChange={setAllowedTools}
+                                    placeholder="calculator, search"
+                                />
+                            </FormField>
+                            <FormField label="Blocked Tools" hint="Blacklist (comma-separated)">
+                                <TextInput
+                                    value={blockedTools}
+                                    onChange={setBlockedTools}
+                                    placeholder="delete_file, format_disk"
                                 />
                             </FormField>
                         </>

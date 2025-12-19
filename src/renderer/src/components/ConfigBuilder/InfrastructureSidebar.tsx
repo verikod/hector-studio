@@ -8,7 +8,10 @@ import { LLMModal } from './LLMModal';
 import { ToolModal } from './ToolModal';
 import { GuardrailModal } from './GuardrailModal';
 import { DatabaseModal, EmbedderModal, VectorStoreModal, DocumentStoreModal } from './OtherModals';
+import { GlobalConfigModal } from './GlobalConfigModal';
 import { useStore } from '../../store/useStore';
+import { Globe } from 'lucide-react';
+
 
 interface InfrastructureSidebarProps {
   yamlContent: string;
@@ -126,6 +129,7 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
   const [embedderModalOpen, setEmbedderModalOpen] = useState(false);
   const [vectorStoreModalOpen, setVectorStoreModalOpen] = useState(false);
   const [documentStoreModalOpen, setDocumentStoreModalOpen] = useState(false);
+  const [globalConfigModalOpen, setGlobalConfigModalOpen] = useState(false);
 
   const [editingLLM, setEditingLLM] = useState<{ id: string; config: LLMConfig } | null>(null);
   const [editingTool, setEditingTool] = useState<{ id: string; config: ToolConfig } | null>(null);
@@ -328,271 +332,200 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
     setYamlContent(newYaml);
   }, [yamlContent, setYamlContent]);
 
-  if (collapsed) {
-    return (
-      <div className="w-16 bg-black/40 border-r border-white/10 flex flex-col items-center py-4 gap-6">
-        <button onClick={onToggle} className="flex flex-col items-center gap-1 hover:bg-white/5 p-2 rounded transition-colors w-full" title="LLMs">
-          <Cpu size={20} className="text-blue-400" />
-          <span className="text-xs text-gray-400">{Object.keys(infrastructure.llms).length}</span>
-        </button>
-        <button onClick={onToggle} className="flex flex-col items-center gap-1 hover:bg-white/5 p-2 rounded transition-colors w-full" title="Tools">
-          <Wrench size={20} className="text-yellow-400" />
-          <span className="text-xs text-gray-400">{Object.keys(infrastructure.tools).length}</span>
-        </button>
-        <button onClick={onToggle} className="flex flex-col items-center gap-1 hover:bg-white/5 p-2 rounded transition-colors w-full" title="Guardrails">
-          <Shield size={20} className="text-red-400" />
-          <span className="text-xs text-gray-400">{Object.keys(infrastructure.guardrails).length}</span>
-        </button>
-        <button onClick={onToggle} className="flex flex-col items-center gap-1 hover:bg-white/5 p-2 rounded transition-colors w-full" title="Databases">
-          <Database size={20} className="text-green-400" />
-          <span className="text-xs text-gray-400">{Object.keys(infrastructure.databases).length}</span>
-        </button>
-        <button onClick={onToggle} className="flex flex-col items-center gap-1 hover:bg-white/5 p-2 rounded transition-colors w-full" title="Embedders">
-          <Layers size={20} className="text-purple-400" />
-          <span className="text-xs text-gray-400">{Object.keys(infrastructure.embedders).length}</span>
-        </button>
-        <button onClick={onToggle} className="flex flex-col items-center gap-1 hover:bg-white/5 p-2 rounded transition-colors w-full" title="Vector Stores">
-          <Box size={20} className="text-orange-400" />
-          <span className="text-xs text-gray-400">{Object.keys(infrastructure.vectorStores).length}</span>
-        </button>
-        <button onClick={onToggle} className="flex flex-col items-center gap-1 hover:bg-white/5 p-2 rounded transition-colors w-full" title="Document Stores">
-          <FileText size={20} className="text-cyan-400" />
-          <span className="text-xs text-gray-400">{Object.keys(infrastructure.documentStores).length}</span>
+  const SECTIONS = useMemo(() => [
+    {
+      key: 'llms' as const,
+      title: 'LLMs',
+      icon: Cpu,
+      color: 'text-blue-400',
+      iconBg: 'bg-blue-500/10 group-hover:bg-blue-500/20',
+      dotColor: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]',
+      itemColor: 'text-blue-300',
+      add: handleAddLLM,
+      edit: handleEditLLM,
+      delete: handleDeleteLLM,
+    },
+    {
+      key: 'tools' as const,
+      title: 'Tools',
+      icon: Wrench,
+      color: 'text-yellow-400',
+      iconBg: 'bg-yellow-500/10 group-hover:bg-yellow-500/20',
+      dotColor: 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.8)]',
+      itemColor: 'text-yellow-300',
+      add: handleAddTool,
+      edit: handleEditTool,
+      delete: handleDeleteTool,
+    },
+    {
+      key: 'guardrails' as const,
+      title: 'Guardrails',
+      icon: Shield,
+      color: 'text-red-400',
+      iconBg: 'bg-red-500/10 group-hover:bg-red-500/20',
+      dotColor: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]',
+      itemColor: 'text-red-300',
+      add: handleAddGuardrail,
+      edit: handleEditGuardrail,
+      delete: handleDeleteGuardrail,
+    },
+    {
+      key: 'databases' as const,
+      title: 'Databases',
+      icon: Database,
+      color: 'text-green-400',
+      iconBg: 'bg-green-500/10 group-hover:bg-green-500/20',
+      dotColor: 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]',
+      itemColor: 'text-green-300',
+      add: handleAddDatabase,
+      edit: handleEditDatabase,
+      delete: handleDeleteDatabase,
+    },
+    {
+      key: 'embedders' as const,
+      title: 'Embedders',
+      icon: Layers,
+      color: 'text-purple-400',
+      iconBg: 'bg-purple-500/10 group-hover:bg-purple-500/20',
+      dotColor: 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]',
+      itemColor: 'text-purple-300',
+      add: handleAddEmbedder,
+      edit: handleEditEmbedder,
+      delete: handleDeleteEmbedder,
+    },
+    {
+      key: 'vectorStores' as const,
+      title: 'Vector Stores',
+      icon: Box,
+      color: 'text-orange-400',
+      iconBg: 'bg-orange-500/10 group-hover:bg-orange-500/20',
+      dotColor: 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]',
+      itemColor: 'text-orange-300',
+      add: handleAddVectorStore,
+      edit: handleEditVectorStore,
+      delete: handleDeleteVectorStore,
+    },
+    {
+      key: 'documentStores' as const,
+      title: 'Document Stores',
+      icon: FileText,
+      color: 'text-cyan-400',
+      iconBg: 'bg-cyan-500/10 group-hover:bg-cyan-500/20',
+      dotColor: 'bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]',
+      itemColor: 'text-cyan-300',
+      add: handleAddDocumentStore,
+      edit: handleEditDocumentStore,
+      delete: handleDeleteDocumentStore,
+    },
+  ], [
+    handleAddLLM, handleEditLLM, handleDeleteLLM,
+    handleAddTool, handleEditTool, handleDeleteTool,
+    handleAddGuardrail, handleEditGuardrail, handleDeleteGuardrail,
+    handleAddDatabase, handleEditDatabase, handleDeleteDatabase,
+    handleAddEmbedder, handleEditEmbedder, handleDeleteEmbedder,
+    handleAddVectorStore, handleEditVectorStore, handleDeleteVectorStore,
+    handleAddDocumentStore, handleEditDocumentStore, handleDeleteDocumentStore
+  ]);
+
+  // Determine sidebar content based on collapsed state
+  const sidebarContent = collapsed ? (
+    <div className="w-16 bg-black/40 border-r border-white/10 flex flex-col items-center">
+      {/* Header / Toggle */}
+      <div className="flex-none w-full h-[45px] flex items-center justify-center border-b border-white/10">
+        <button onClick={onToggle} className="p-1 text-gray-400 hover:text-white transition-colors" title="Expand sidebar">
+          <Layers size={16} />
         </button>
       </div>
-    );
-  }
 
-  return (
-    <>
-      <div className="w-64 bg-black/40 border-r border-white/10 flex flex-col overflow-hidden">
-        <div className="flex-none px-4 py-3 border-b border-white/10 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Resources</h2>
-          <button onClick={onToggle} className="text-gray-400 hover:text-white transition-colors" title="Collapse sidebar">
+      {/* Global Config */}
+      <div className="flex-none p-2 w-full border-b border-white/10 flex justify-center">
+        <button
+          onClick={() => setGlobalConfigModalOpen(true)}
+          className="p-2 bg-hector-green/10 hover:bg-hector-green/20 text-hector-green border border-hector-green/20 rounded transition-colors"
+          title="Global Settings"
+        >
+          <Globe size={16} />
+        </button>
+      </div>
+
+      {/* Resources List */}
+      <div className="flex-1 w-full overflow-y-auto custom-scrollbar flex flex-col items-center py-2 gap-2">
+        {SECTIONS.map((section) => (
+          <button
+            key={section.key}
+            onClick={onToggle}
+            className="p-2 hover:bg-white/5 rounded transition-colors relative group"
+            title={`${section.title} (${Object.keys(infrastructure[section.key]).length})`}
+          >
+            <section.icon size={20} className={section.color} />
+            <span className="absolute -top-1 -right-1 bg-black/80 text-[10px] text-gray-400 px-1 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+              {Object.keys(infrastructure[section.key]).length}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : (
+    <div className="w-64 bg-black/40 border-r border-white/10 flex flex-col overflow-hidden">
+      <div className="flex-none px-4 py-3 border-b border-white/10 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Resources</h2>
+        <div className="flex items-center gap-1">
+          <button onClick={onToggle} className="p-1 text-gray-400 hover:text-white transition-colors" title="Collapse sidebar">
             <Layers size={16} className="rotate-90" />
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* LLMs */}
-          <div className="border-b border-white/10">
-            <SectionHeader
-              icon={<Cpu size={16} className="text-blue-400" />}
-              iconBgClass="bg-blue-500/10 group-hover:bg-blue-500/20"
-              title="LLMs"
-              count={Object.keys(infrastructure.llms).length}
-              isExpanded={expandedSection === 'llms'}
-              dotColor="bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
-              onToggle={() => setExpandedSection(expandedSection === 'llms' ? null : 'llms')}
-              onAdd={handleAddLLM}
-            />
-            {expandedSection === 'llms' && (
-              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
-                {Object.entries(infrastructure.llms).map(([name, config]) => (
-                  <SectionItem
-                    key={name}
-                    name={name}
-                    config={config as LLMConfig}
-                    color="text-blue-300"
-                    usageCount={infrastructure.llmUsage[name]}
-                    onEdit={() => handleEditLLM(name, config as LLMConfig)}
-                    onDelete={() => handleDeleteLLM(name)}
-                  />
-                ))}
-                {Object.keys(infrastructure.llms).length === 0 && (
-                  <div className="text-xs text-center py-2 text-gray-600 italic">No LLMs defined</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Tools */}
-          <div className="border-b border-white/10">
-            <SectionHeader
-              icon={<Wrench size={16} className="text-yellow-400" />}
-              iconBgClass="bg-yellow-500/10 group-hover:bg-yellow-500/20"
-              title="Tools"
-              count={Object.keys(infrastructure.tools).length}
-              isExpanded={expandedSection === 'tools'}
-              dotColor="bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.8)]"
-              onToggle={() => setExpandedSection(expandedSection === 'tools' ? null : 'tools')}
-              onAdd={handleAddTool}
-            />
-            {expandedSection === 'tools' && (
-              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
-                {Object.entries(infrastructure.tools).map(([name, config]) => (
-                  <SectionItem
-                    key={name}
-                    name={name}
-                    config={config as ToolConfig}
-                    color="text-yellow-300"
-                    onEdit={() => handleEditTool(name, config as ToolConfig)}
-                    onDelete={() => handleDeleteTool(name)}
-                  />
-                ))}
-                {Object.keys(infrastructure.tools).length === 0 && (
-                  <div className="text-xs text-center py-2 text-gray-600 italic">No tools defined</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Guardrails */}
-          <div className="border-b border-white/10">
-            <SectionHeader
-              icon={<Shield size={16} className="text-red-400" />}
-              iconBgClass="bg-red-500/10 group-hover:bg-red-500/20"
-              title="Guardrails"
-              count={Object.keys(infrastructure.guardrails).length}
-              isExpanded={expandedSection === 'guardrails'}
-              dotColor="bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
-              onToggle={() => setExpandedSection(expandedSection === 'guardrails' ? null : 'guardrails')}
-              onAdd={handleAddGuardrail}
-            />
-            {expandedSection === 'guardrails' && (
-              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
-                {Object.entries(infrastructure.guardrails).map(([name, config]) => (
-                  <SectionItem
-                    key={name}
-                    name={name}
-                    config={config as GuardrailConfig}
-                    color="text-red-300"
-                    onEdit={() => handleEditGuardrail(name, config as GuardrailConfig)}
-                    onDelete={() => handleDeleteGuardrail(name)}
-                  />
-                ))}
-                {Object.keys(infrastructure.guardrails).length === 0 && (
-                  <div className="text-xs text-center py-2 text-gray-600 italic">No guardrails defined</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Databases */}
-          <div className="border-b border-white/10">
-            <SectionHeader
-              icon={<Database size={16} className="text-green-400" />}
-              iconBgClass="bg-green-500/10 group-hover:bg-green-500/20"
-              title="Databases"
-              count={Object.keys(infrastructure.databases).length}
-              isExpanded={expandedSection === 'databases'}
-              dotColor="bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"
-              onToggle={() => setExpandedSection(expandedSection === 'databases' ? null : 'databases')}
-              onAdd={handleAddDatabase}
-            />
-            {expandedSection === 'databases' && (
-              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
-                {Object.entries(infrastructure.databases).map(([name, config]) => (
-                  <SectionItem
-                    key={name}
-                    name={name}
-                    config={config as DatabaseConfig}
-                    color="text-green-300"
-                    onEdit={() => handleEditDatabase(name, config as DatabaseConfig)}
-                    onDelete={() => handleDeleteDatabase(name)}
-                  />
-                ))}
-                {Object.keys(infrastructure.databases).length === 0 && (
-                  <div className="text-xs text-center py-2 text-gray-600 italic">No databases defined</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Embedders */}
-          <div className="border-b border-white/10">
-            <SectionHeader
-              icon={<Layers size={16} className="text-purple-400" />}
-              iconBgClass="bg-purple-500/10 group-hover:bg-purple-500/20"
-              title="Embedders"
-              count={Object.keys(infrastructure.embedders).length}
-              isExpanded={expandedSection === 'embedders'}
-              dotColor="bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]"
-              onToggle={() => setExpandedSection(expandedSection === 'embedders' ? null : 'embedders')}
-              onAdd={handleAddEmbedder}
-            />
-            {expandedSection === 'embedders' && (
-              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
-                {Object.entries(infrastructure.embedders).map(([name, config]) => (
-                  <SectionItem
-                    key={name}
-                    name={name}
-                    config={config as EmbedderConfig}
-                    color="text-purple-300"
-                    onEdit={() => handleEditEmbedder(name, config as EmbedderConfig)}
-                    onDelete={() => handleDeleteEmbedder(name)}
-                  />
-                ))}
-                {Object.keys(infrastructure.embedders).length === 0 && (
-                  <div className="text-xs text-center py-2 text-gray-600 italic">No embedders defined</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Vector Stores */}
-          <div className="border-b border-white/10">
-            <SectionHeader
-              icon={<Box size={16} className="text-orange-400" />}
-              iconBgClass="bg-orange-500/10 group-hover:bg-orange-500/20"
-              title="Vector Stores"
-              count={Object.keys(infrastructure.vectorStores).length}
-              isExpanded={expandedSection === 'vectorStores'}
-              dotColor="bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]"
-              onToggle={() => setExpandedSection(expandedSection === 'vectorStores' ? null : 'vectorStores')}
-              onAdd={handleAddVectorStore}
-            />
-            {expandedSection === 'vectorStores' && (
-              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
-                {Object.entries(infrastructure.vectorStores).map(([name, config]) => (
-                  <SectionItem
-                    key={name}
-                    name={name}
-                    config={config as VectorStoreConfig}
-                    color="text-orange-300"
-                    onEdit={() => handleEditVectorStore(name, config as VectorStoreConfig)}
-                    onDelete={() => handleDeleteVectorStore(name)}
-                  />
-                ))}
-                {Object.keys(infrastructure.vectorStores).length === 0 && (
-                  <div className="text-xs text-center py-2 text-gray-600 italic">No vector stores defined</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Document Stores */}
-          <div className="border-b border-white/10">
-            <SectionHeader
-              icon={<FileText size={16} className="text-cyan-400" />}
-              iconBgClass="bg-cyan-500/10 group-hover:bg-cyan-500/20"
-              title="Document Stores"
-              count={Object.keys(infrastructure.documentStores).length}
-              isExpanded={expandedSection === 'documentStores'}
-              dotColor="bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]"
-              onToggle={() => setExpandedSection(expandedSection === 'documentStores' ? null : 'documentStores')}
-              onAdd={handleAddDocumentStore}
-            />
-            {expandedSection === 'documentStores' && (
-              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
-                {Object.entries(infrastructure.documentStores).map(([name, config]) => (
-                  <SectionItem
-                    key={name}
-                    name={name}
-                    config={config as DocumentStoreConfig}
-                    color="text-cyan-300"
-                    onEdit={() => handleEditDocumentStore(name, config as DocumentStoreConfig)}
-                    onDelete={() => handleDeleteDocumentStore(name)}
-                  />
-                ))}
-                {Object.keys(infrastructure.documentStores).length === 0 && (
-                  <div className="text-xs text-center py-2 text-gray-600 italic">No document stores defined</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
+
+      <div className="flex-none p-2 border-b border-white/10">
+        <button
+          onClick={() => setGlobalConfigModalOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2 bg-hector-green/10 hover:bg-hector-green/20 text-hector-green border border-hector-green/20 rounded transition-colors group"
+        >
+          <Globe size={16} />
+          <span className="text-sm font-medium">Global Settings</span>
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {SECTIONS.map((section) => (
+          <div key={section.key} className="border-b border-white/10">
+            <SectionHeader
+              icon={<section.icon size={16} className={section.color} />}
+              iconBgClass={section.iconBg}
+              title={section.title}
+              count={Object.keys(infrastructure[section.key]).length}
+              isExpanded={expandedSection === section.key}
+              dotColor={section.dotColor}
+              onToggle={() => setExpandedSection(expandedSection === section.key ? null : section.key)}
+              onAdd={section.add}
+            />
+            {expandedSection === section.key && (
+              <div className="px-4 pb-3 space-y-2 bg-black/20 border-t border-white/5 pt-2">
+                {Object.entries(infrastructure[section.key]).map(([name, config]) => (
+                  <SectionItem
+                    key={name}
+                    name={name}
+                    config={config}
+                    color={section.itemColor}
+                    usageCount={section.key === 'llms' ? infrastructure.llmUsage[name] : undefined}
+                    onEdit={() => section.edit(name, config as any)}
+                    onDelete={() => section.delete(name)}
+                  />
+                ))}
+                {Object.keys(infrastructure[section.key]).length === 0 && (
+                  <div className="text-xs text-center py-2 text-gray-600 italic">No {section.title.toLowerCase()} defined</div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {sidebarContent}
 
       {/* Modals */}
       <LLMModal
@@ -658,6 +591,11 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
         vectorStoreOptions={Object.keys(infrastructure.vectorStores)}
         editId={editingDocumentStore?.id}
         editConfig={editingDocumentStore?.config}
+      />
+
+      <GlobalConfigModal
+        isOpen={globalConfigModalOpen}
+        onClose={() => setGlobalConfigModalOpen(false)}
       />
     </>
   );

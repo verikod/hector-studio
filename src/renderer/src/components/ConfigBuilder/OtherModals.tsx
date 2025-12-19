@@ -72,7 +72,7 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
             </FormField>
 
             <FormField label="Connection String (DSN)" hint="Use ${ENV_VAR} for env variables">
-                <TextInput value={dsn} onChange={setDsn} placeholder="${DATABASE_URL}" type="password" />
+                <TextInput value={dsn} onChange={setDsn} placeholder="${DATABASE_URL}" />
             </FormField>
         </ResourceModal>
     );
@@ -184,6 +184,7 @@ export const VectorStoreModal: React.FC<VectorStoreModalProps> = ({
     const [id, setId] = useState('');
     const [provider, setProvider] = useState('chromem');
     const [url, setUrl] = useState('');
+    const [apiKey, setApiKey] = useState('');
     const [collection, setCollection] = useState('');
 
     useEffect(() => {
@@ -192,11 +193,13 @@ export const VectorStoreModal: React.FC<VectorStoreModalProps> = ({
                 setId(editId);
                 setProvider(editConfig.provider || 'chromem');
                 setUrl(editConfig.url || '');
+                setApiKey(editConfig.api_key || '');
                 setCollection(editConfig.collection || '');
             } else {
                 setId('');
                 setProvider('chromem');
                 setUrl('');
+                setApiKey('');
                 setCollection('');
             }
         }
@@ -206,6 +209,7 @@ export const VectorStoreModal: React.FC<VectorStoreModalProps> = ({
         onSave(id, {
             provider,
             url: url || undefined,
+            api_key: apiKey || undefined,
             collection: collection || undefined
         });
         onClose();
@@ -240,9 +244,14 @@ export const VectorStoreModal: React.FC<VectorStoreModalProps> = ({
             </FormField>
 
             {provider !== 'chromem' && (
-                <FormField label="URL" hint="Server URL">
-                    <TextInput value={url} onChange={setUrl} placeholder="http://localhost:6333" />
-                </FormField>
+                <>
+                    <FormField label="URL" hint="Server URL">
+                        <TextInput value={url} onChange={setUrl} placeholder="http://localhost:6333" />
+                    </FormField>
+                    <FormField label="API Key" hint="Use ${ENV_VAR} for secrets">
+                        <TextInput value={apiKey} onChange={setApiKey} placeholder="${VECTOR_STORE_API_KEY}" type="password" />
+                    </FormField>
+                </>
             )}
 
             <FormField label="Collection">

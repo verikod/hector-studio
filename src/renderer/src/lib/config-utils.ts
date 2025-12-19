@@ -12,7 +12,47 @@ export interface HectorConfig {
   vector_stores?: Record<string, VectorStoreConfig>;
   document_stores?: Record<string, DocumentStoreConfig>;
   agents?: Record<string, AgentConfig>;
+  storage?: StorageConfig;
+  observability?: ObservabilityConfig;
   defaults?: { llm?: string };
+}
+
+export interface StorageConfig {
+  tasks?: { backend?: string; database?: string };
+  sessions?: { backend?: string; database?: string };
+  memory?: {
+    backend?: string;
+    embedder?: string; // Reference to embedder config
+    database?: string; // For SQL or Redis backend
+    vector_provider?: { // For vector backend
+      type?: 'chromem' | 'qdrant' | 'chroma' | 'pinecone';
+      chromem?: { persist_path?: string; compress?: boolean };
+      qdrant?: { url?: string; api_key?: string; collection?: string };
+    };
+  };
+  checkpoint?: {
+    enabled?: boolean;
+    backend?: string;
+    database?: string;
+    strategy?: 'event' | 'interval' | 'hybrid';
+    interval?: number;
+    after_tools?: boolean;
+    before_llm?: boolean;
+    recovery?: {
+        auto_resume?: boolean;
+        timeout?: number;
+    };
+  };
+}
+
+export interface ObservabilityConfig {
+  metrics?: { enabled?: boolean };
+  tracing?: {
+    enabled?: boolean;
+    exporter?: string;
+    endpoint?: string;
+    sampling_rate?: number;
+  };
 }
 
 export interface LLMConfig {
@@ -60,6 +100,16 @@ export interface GuardrailConfig {
       detect_phone?: boolean;
       redact_mode?: string;
     };
+    content?: {
+      enabled?: boolean;
+      blocked_keywords?: string[];
+      blocked_patterns?: string[];
+    };
+  };
+  tool?: {
+    enabled?: boolean;
+    allowed_tools?: string[];
+    blocked_tools?: string[];
   };
 }
 

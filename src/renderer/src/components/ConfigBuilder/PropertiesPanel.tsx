@@ -45,6 +45,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     documentStores: data?.documentStores || [],
     subAgents: data?.subAgents || [],
     agentTools: data?.agentTools || [],
+
+    context: data?.context || { strategy: 'none', window_size: 0, budget: 0 },
     url: data?.url || '',
   });
 
@@ -59,6 +61,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       documentStores: data?.documentStores || [],
       subAgents: data?.subAgents || [],
       agentTools: data?.agentTools || [],
+
+      context: data?.context || { strategy: 'none', window_size: 0, budget: 0 },
       url: data?.url || '',
     });
   }, [data]);
@@ -159,7 +163,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
 
         {/* LLM & Tools Section (for non-workflow agents) */}
-        {!isWorkflow && !isRemote && (
+        {!isWorkflow && !isRemote && (<>
           <div className="space-y-3 pt-2 border-t border-white/10">
             <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
               <Zap size={12} />
@@ -213,49 +217,100 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               />
             </div>
           </div>
-        )}
+
+          <div className="pt-2 border-t border-white/10">
+            <label className="block text-sm font-medium mb-1.5">Context Management</label>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Strategy</label>
+                <select
+                  value={localData.context.strategy || 'none'}
+                  onChange={(e) => handleChange('context', { ...localData.context, strategy: e.target.value })}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                >
+                  <option value="none">None (Full History)</option>
+                  <option value="window">Sliding Window</option>
+                  <option value="summary">Summary Buffer</option>
+                </select>
+              </div>
+
+              {localData.context.strategy === 'window' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Window Size</label>
+                  <input
+                    type="number"
+                    value={localData.context.window_size || 10}
+                    onChange={(e) => handleChange('context', { ...localData.context, window_size: parseInt(e.target.value) })}
+                    disabled={readonly}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                    placeholder="e.g. 10"
+                  />
+                </div>
+              )}
+
+              {localData.context.strategy === 'summary' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Token Budget</label>
+                  <input
+                    type="number"
+                    value={localData.context.budget || 2048}
+                    onChange={(e) => handleChange('context', { ...localData.context, budget: parseInt(e.target.value) })}
+                    disabled={readonly}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                    placeholder="e.g. 2048"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </>)}
 
         {/* Workflow Sub-Agents Section */}
-        {isWorkflow && agentOptions.length > 0 && (
-          <div className="space-y-3 pt-2 border-t border-white/10">
-            <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <Users size={12} />
-              <span>Sub-Agents</span>
-            </div>
+        {
+          isWorkflow && agentOptions.length > 0 && (
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <Users size={12} />
+                <span>Sub-Agents</span>
+              </div>
 
-            <div className="space-y-1 max-h-40 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
-              {agentOptions.map((agent) => (
-                <label key={agent} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
-                  <input
-                    type="checkbox"
-                    checked={localData.subAgents.includes(agent)}
-                    onChange={(e) => handleMultiSelect('subAgents', agent, e.target.checked)}
-                    disabled={readonly}
-                    className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
-                  />
-                  <span>{agent}</span>
-                </label>
-              ))}
+              <div className="space-y-1 max-h-40 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+                {agentOptions.map((agent) => (
+                  <label key={agent} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
+                    <input
+                      type="checkbox"
+                      checked={localData.subAgents.includes(agent)}
+                      onChange={(e) => handleMultiSelect('subAgents', agent, e.target.checked)}
+                      disabled={readonly}
+                      className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                    />
+                    <span>{agent}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Remote Agent URL */}
-        {isRemote && (
-          <div className="space-y-3 pt-2 border-t border-white/10">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Remote URL</label>
-              <input
-                type="text"
-                value={localData.url}
-                onChange={(e) => handleChange('url', e.target.value)}
-                disabled={readonly}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
-                placeholder="http://localhost:9000"
-              />
+        {
+          isRemote && (
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Remote URL</label>
+                <input
+                  type="text"
+                  value={localData.url}
+                  onChange={(e) => handleChange('url', e.target.value)}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                  placeholder="http://localhost:9000"
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Advanced Section */}
         <div className="space-y-3 pt-2 border-t border-white/10">
@@ -324,7 +379,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };

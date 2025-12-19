@@ -53,6 +53,8 @@ export const ToolModal: React.FC<ToolModalProps> = ({
     const [transport, setTransport] = useState('sse');
     const [command, setCommand] = useState('');
     const [args, setArgs] = useState('');
+    const [env, setEnv] = useState('');
+    const [filter, setFilter] = useState('');
 
     // Function fields
     const [handler, setHandler] = useState('');
@@ -74,6 +76,8 @@ export const ToolModal: React.FC<ToolModalProps> = ({
                 setTransport(editConfig.transport || 'sse');
                 setCommand(editConfig.command || '');
                 setArgs(editConfig.args?.join(' ') || '');
+                setEnv(editConfig.env ? Object.entries(editConfig.env).map(([k, v]) => `${k}=${v}`).join('\n') : '');
+                setFilter(editConfig.filter?.join(', ') || '');
                 setHandler(editConfig.handler || '');
                 setWorkingDirectory(editConfig.working_directory || './');
                 setMaxExecutionTime(editConfig.max_execution_time || '30s');
@@ -87,7 +91,10 @@ export const ToolModal: React.FC<ToolModalProps> = ({
                 setUrl('');
                 setTransport('sse');
                 setCommand('');
+                setCommand('');
                 setArgs('');
+                setEnv('');
+                setFilter('');
                 setHandler('');
                 setWorkingDirectory('./');
                 setMaxExecutionTime('30s');
@@ -113,6 +120,16 @@ export const ToolModal: React.FC<ToolModalProps> = ({
                 config.transport = transport;
                 config.url = url || undefined;
             }
+            if (env) {
+                config.env = env.split('\n').reduce((acc, line) => {
+                    const [k, ...v] = line.split('=');
+                    if (k && k.trim()) acc[k.trim()] = v.join('=').trim();
+                    return acc;
+                }, {} as Record<string, string>);
+                if (Object.keys(config.env).length === 0) delete config.env;
+            }
+            config.filter = filter ? filter.split(',').map(s => s.trim()).filter(Boolean) : undefined;
+            if (config.filter && config.filter.length === 0) delete config.filter;
         } else if (type === 'function') {
             config.handler = handler || undefined;
         } else if (type === 'command') {
@@ -205,6 +222,24 @@ export const ToolModal: React.FC<ToolModalProps> = ({
                             />
                         </FormField>
                     )}
+
+
+                    <FormField label="Environment Variables" hint="KEY=VALUE (one per line)">
+                        <TextAreaInput
+                            value={env}
+                            onChange={setEnv}
+                            placeholder="API_KEY=123&#10;DEBUG=true"
+                            rows={3}
+                        />
+                    </FormField>
+
+                    <FormField label="Tool Filter" hint="Comma-separated list of tools to expose (whitelist)">
+                        <TextInput
+                            value={filter}
+                            onChange={setFilter}
+                            placeholder="read_file, list_files"
+                        />
+                    </FormField>
                 </>
             )}
 
