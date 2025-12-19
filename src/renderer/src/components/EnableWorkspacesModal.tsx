@@ -22,10 +22,9 @@ export const EnableWorkspacesModal: React.FC<EnableWorkspacesModalProps> = ({
 }) => {
     const [stage, setStage] = useState<EnableStage>('consent');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const { enableAndSelect } = useWorkspaceControl();
 
     if (!isOpen) return null;
-
-    const { enableAndSelect } = useWorkspaceControl();
 
     const handleEnable = async () => {
         try {
