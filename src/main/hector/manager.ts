@@ -344,6 +344,12 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
 
     if (hectorProcess) {
         console.log('[hector] Already running this workspace')
+        // Ensure state is synced even if already running
+        if (currentStatus === 'running') {
+            serverManager.setActiveServer(workspace.id)
+            emitServersUpdated()
+            emitWorkspaceStatus(workspace.id, 'running')
+        }
         return
     }
 

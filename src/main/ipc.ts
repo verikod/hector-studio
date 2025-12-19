@@ -156,8 +156,9 @@ export function registerIPCHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle('workspaces:disable', () => {
+  ipcMain.handle('workspaces:disable', async () => {
     console.log('[ipc] Disabling workspaces')
+    await stopWorkspace()
     serverManager.setWorkspacesEnabled(false)
     return { success: true }
   })
