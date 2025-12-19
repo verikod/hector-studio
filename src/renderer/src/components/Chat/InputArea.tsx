@@ -1,27 +1,23 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Paperclip, Send, X } from "lucide-react";
-import { StreamParser } from "../../lib/stream-parser";
 import { useStore } from "../../store/useStore";
+import { useSendMessage } from "../../lib/hooks/useSendMessage";
 import type { Attachment } from "../../types";
 import { cn } from "../../lib/utils";
 import { TIMING, UI } from "../../lib/constants";
-import { handleError } from "../../lib/error-handler";
-import { generateId, generateShortId } from "../../lib/id-generator";
-import { createStreamDispatcher } from "../../lib/stream-utils";
+import { generateId } from "../../lib/id-generator";
 
 export const InputArea: React.FC<{ onSend?: () => void }> = React.memo(({ onSend }) => {
   // Use selectors for better performance - only subscribe to specific state slices
   const currentSessionId = useStore((state) => state.currentSessionId);
-  const addMessage = useStore((state) => state.addMessage);
   const selectedAgent = useStore((state) => state.selectedAgent);
   const isGenerating = useStore((state) => state.isGenerating);
-  const setIsGenerating = useStore((state) => state.setIsGenerating);
-  const setActiveStreamParser = useStore(
-    (state) => state.setActiveStreamParser,
-  );
   const cancelGeneration = useStore((state) => state.cancelGeneration);
   const supportedFileTypes = useStore((state) => state.supportedFileTypes);
-  const updateSessionTitle = useStore((state) => state.updateSessionTitle);
+
+  // Use custom hook for message sending logic
+  const { sendMessage } = useSendMessage();
+
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -165,118 +161,11 @@ export const InputArea: React.FC<{ onSend?: () => void }> = React.memo(({ onSend
     setAttachments([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-    // Add user message to UI
-    const userMessageId = generateId();
-    addMessage(currentSessionId, {
-      id: userMessageId,
-      role: "user",
-      text: messageText,
-      metadata: {
-        images: messageAttachments,
-      },
-      widgets: [],
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    });
+    // Notify parent immediately so layout can switch
+    if (onSend) onSend();
 
-    // Update session title from first user message
-    const sessions = useStore.getState().sessions;
-    const session = sessions[currentSessionId];
-    if (session && session.title === "New conversation" && messageText) {
-      const title =
-        messageText.length > UI.MAX_TITLE_LENGTH
-          ? messageText.substring(0, UI.MAX_TITLE_LENGTH) + "..."
-          : messageText;
-      updateSessionTitle(currentSessionId, title);
-    }
-
-    // Create agent message placeholder
-    const agentMessageId = generateId();
-    addMessage(currentSessionId, {
-      id: agentMessageId,
-      role: "agent",
-      text: "",
-      metadata: {},
-      widgets: [],
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    });
-
-    setIsGenerating(true);
-
-    // Create dispatcher and parser
-    const dispatcher = createStreamDispatcher();
-    const parser = new StreamParser(currentSessionId, agentMessageId, dispatcher);
-    setActiveStreamParser(parser);
-
-    try {
-
-      // Prepare parts - A2A spec requires "kind" field
-      const parts: Array<{
-        kind: string;
-        text?: string;
-        file?: { bytes: string; mimeType: string; name: string };
-      }> = [];
-      if (messageText) parts.push({ kind: "text", text: messageText });
-
-      for (const att of messageAttachments) {
-        parts.push({
-          kind: "file",
-          file: {
-            bytes: att.base64,
-            mimeType: att.mediaType,
-            name: att.file.name,
-          },
-        });
-      }
-
-      // A2A spec: params.message with contextId for multi-turn
-      // Include taskId for follow-up messages to maintain conversation context
-      const currentSession = sessions[currentSessionId];
-      const messageParams: any = {
-        contextId: currentSession.contextId,
-        role: "user",
-        parts: parts,
-      };
-
-      // If we have a taskId from previous response, include it for continuity
-      // FIXED: We rely on ContextID for threading.
-      // Sending taskId for follow-ups causes the backend to think we are trying to resume
-      // a completed unique-task.
-
-      const requestBody = {
-        jsonrpc: "2.0",
-        method: "message/stream",
-        params: {
-          message: messageParams,
-        },
-        id: generateShortId(),
-      };
-
-      if (!selectedAgent) throw new Error("No agent selected");
-
-
-
-      // Notify parent immediately so layout can switch
-      if (onSend) onSend();
-
-      // A2A spec: POST to agent's URL - streaming is determined by method name
-      await parser.stream(selectedAgent.url, requestBody);
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name !== "AbortError") {
-        handleError(error, "Failed to send message");
-        setIsGenerating(false);
-      }
-    } finally {
-      // Note: Don't set isGenerating(false) here - StreamParser.stream() handles it
-      // This prevents prematurely showing the send button during HITL approval flow
-      parser.cleanup(); // Clean up widget tracking to prevent memory leaks
-      setActiveStreamParser(null);
-    }
+    // Delegate to custom hook
+    await sendMessage(messageText, messageAttachments);
   };
 
   return (
