@@ -12,7 +12,6 @@ import { useHealthPolling } from "./lib/hooks/useHealthPolling";
 import { useLicenseInit } from "./lib/hooks/useLicenseInit";
 import { useStateInit } from "./lib/hooks/useStateInit";
 import { UnifiedHeader } from "./components/UnifiedHeader";
-import { AppFooter } from "./components/AppFooter";
 import { CoverOverlay } from "./components/CoverOverlay";
 import { LoginModal } from "./components/LoginModal";
 import { InitializationCover } from "./components/InitializationCover";
@@ -318,9 +317,6 @@ function App() {
           <div className="flex-1 bg-gray-900/20" />
         )}
       </main>
-
-      {/* App Footer with screen mode and settings */}
-      <AppFooter onOpenSettings={() => setShowSettings(true)} />
 
       {/* License Upgrade Banner - shown for unlicensed users */}
       {isLicensed === false && (
