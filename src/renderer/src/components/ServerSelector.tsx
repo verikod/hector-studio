@@ -216,19 +216,9 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                     </div>
 
                                     <div className="flex items-center gap-1">
-                                        {/* Local workspaces: Just Delete button */}
-                                        {server.config.isLocal && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
-                                                onClick={(e) => handleRemoveServer(server.config.id, e)}
-                                                title="Delete Workspace"
-                                            >
-                                                <Trash2 size={12} />
-                                            </Button>
-                                        )}
-                                        {/* Remote servers: Login/Logout and Delete */}
+                                        {/* Selected indicator first */}
+                                        {activeServerId === server.config.id && <Check size={14} className="text-green-500" />}
+                                        {/* Remote servers: Login/Logout buttons */}
                                         {!server.config.isLocal && (
                                             <>
                                                 {server.status === 'auth_required' && (
@@ -251,17 +241,18 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                                         <LogOut size={12} />
                                                     </Button>
                                                 )}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
-                                                    onClick={(e) => handleRemoveServer(server.config.id, e)}
-                                                >
-                                                    <Trash2 size={12} />
-                                                </Button>
                                             </>
                                         )}
-                                        {activeServerId === server.config.id && <Check size={14} className="text-green-500 ml-1" />}
+                                        {/* Delete button always last (rightmost) for alignment */}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
+                                            onClick={(e) => handleRemoveServer(server.config.id, e)}
+                                            title={server.config.isLocal ? "Delete Workspace" : "Remove Server"}
+                                        >
+                                            <Trash2 size={12} />
+                                        </Button>
                                     </div>
                                 </DropdownMenuItem>
                             ))
@@ -276,6 +267,7 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                 onChange={(e) => setNewName(e.target.value)}
                                 className="h-7 text-xs bg-black/40 border-gray-700"
                                 onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.key === 'Tab' && e.stopPropagation()}
                             />
                             <Input
                                 placeholder="URL"
@@ -283,6 +275,7 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                 onChange={(e) => setNewUrl(e.target.value)}
                                 className="h-7 text-xs bg-black/40 border-gray-700"
                                 onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.key === 'Tab' && e.stopPropagation()}
                             />
                             <div className="flex gap-2">
                                 <Button size="sm" variant="default" className="h-7 text-xs w-full bg-hector-green hover:bg-hector-green/80 text-white" onClick={handleAddServer}>
