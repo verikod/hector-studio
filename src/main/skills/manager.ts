@@ -4,34 +4,17 @@ import { createWriteStream, mkdirSync, existsSync, writeFileSync } from 'fs'
 import { pipeline } from 'stream'
 import AdmZip from 'adm-zip'
 import { app } from 'electron'
-import { 
-  browsePopular, 
-  keywordSearch, 
-  aiSearch, 
-  SkillsMPSkill, 
-  SkillsMPSearchResult 
-} from './skillsmp'
 
 export interface Skill {
   name: string
   description: string
-  repoUrl: string         // Full GitHub repo URL
-  skillPath?: string      // Path within repo (for tree URLs)
+  repoUrl: string
+  skillPath?: string  // Path within repo (for subdirectory skills)
   author: string
-  category?: string
-  stars?: number
-  source: 'skillsmp' | 'local'
 }
 
-export interface SkillSearchResult {
-  skills: Skill[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    hasNext: boolean
-  }
-}
+const ANTHROPIC_SKILLS_REPO = 'anthropics/claude-code-skills'
+const ANTHROPIC_SKILLS_PATH = 'skills'
 
 export class SkillManager {
   private cachePath: string
@@ -44,98 +27,92 @@ export class SkillManager {
   }
 
   /**
-   * Browse popular skills (default view - sorted by stars)
-   */
-  async browsePopular(page: number = 1, limit: number = 20): Promise<SkillSearchResult> {
-    try {
-      const result = await browsePopular(page, limit)
-      return this.mapSearchResult(result)
-    } catch (error) {
-      console.error('Failed to browse skills:', error)
-      return this.emptyResult()
-    }
-  }
-
-  /**
-   * Search skills using keywords
-   */
-  async searchSkills(query: string, page: number = 1, limit: number = 20): Promise<SkillSearchResult> {
-    try {
-      const result = await keywordSearch(query, page, limit)
-      return this.mapSearchResult(result)
-    } catch (error) {
-      console.error('SkillsMP search failed:', error)
-      return this.emptyResult()
-    }
-  }
-
-  /**
-   * Search skills using AI semantic search
-   */
-  async aiSearchSkills(query: string, page: number = 1, limit: number = 20): Promise<SkillSearchResult> {
-    try {
-      const result = await aiSearch(query, page, limit)
-      return this.mapSearchResult(result)
-    } catch (error) {
-      console.error('SkillsMP AI search failed:', error)
-      return this.emptyResult()
-    }
-  }
-
-  /**
-   * Legacy listSkills - now returns popular skills for backward compatibility
+   * List official Anthropic skills from the claude-code-skills repo
    */
   async listSkills(): Promise<Skill[]> {
-    const result = await this.browsePopular(1, 20)
-    return result.skills
-  }
+    try {
+      // Fetch the skills directory contents from GitHub API
+      const apiUrl = `https://api.github.com/repos/${ANTHROPIC_SKILLS_REPO}/contents/${ANTHROPIC_SKILLS_PATH}`
+      const response = await this.fetchJson(apiUrl)
 
-  private mapSearchResult(result: SkillsMPSearchResult): SkillSearchResult {
-    return {
-      skills: result.skills.map(r => this.mapSkill(r)),
-      pagination: {
-        page: result.pagination.page,
-        limit: result.pagination.limit,
-        total: result.pagination.total,
-        hasNext: result.pagination.hasNext
+      if (!Array.isArray(response)) {
+        console.error('Unexpected response format from GitHub API')
+        return []
       }
-    }
-  }
 
-  private mapSkill(r: SkillsMPSkill): Skill {
-    // Parse GitHub URL to extract skill path for tree URLs
-    // e.g., https://github.com/user/repo/tree/main/path/to/skill
-    let repoUrl = r.githubUrl
-    let skillPath: string | undefined
+      // Filter for directories (each skill is a directory)
+      const skillDirs = response.filter((item: any) => item.type === 'dir')
 
-    const treeMatch = r.githubUrl.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/[^/]+\/(.+)/)
-    if (treeMatch) {
-      const [, owner, repo, path] = treeMatch
-      repoUrl = `https://github.com/${owner}/${repo}`
-      skillPath = path
-    }
+      // Map to Skill interface
+      const skills: Skill[] = skillDirs.map((dir: any) => ({
+        name: dir.name,
+        description: `Official Anthropic skill: ${dir.name}`,
+        repoUrl: `https://github.com/${ANTHROPIC_SKILLS_REPO}`,
+        skillPath: `${ANTHROPIC_SKILLS_PATH}/${dir.name}`,
+        author: 'Anthropic'
+      }))
 
-    return {
-      name: r.name,
-      description: r.description || `Skill from ${r.author || 'community'}`,
-      repoUrl,
-      skillPath,
-      author: r.author || 'unknown',
-      category: r.category,
-      stars: r.stars,
-      source: 'skillsmp'
-    }
-  }
+      // Try to fetch README or description for each skill (optional enhancement)
+      await Promise.all(skills.map(async (skill) => {
+        try {
+          const readmeUrl = `https://raw.githubusercontent.com/${ANTHROPIC_SKILLS_REPO}/main/${skill.skillPath}/README.md`
+          const readme = await this.fetchText(readmeUrl)
+          // Extract first line or paragraph as description
+          const firstLine = readme.split('\n').find(line => 
+            line.trim() && !line.startsWith('#') && !line.startsWith('!')
+          )
+          if (firstLine) {
+            skill.description = firstLine.trim().slice(0, 150)
+          }
+        } catch {
+          // Keep default description if README fetch fails
+        }
+      }))
 
-  private emptyResult(): SkillSearchResult {
-    return {
-      skills: [],
-      pagination: { page: 1, limit: 20, total: 0, hasNext: false }
+      return skills
+    } catch (error) {
+      console.error('Failed to fetch Anthropic skills:', error)
+      return []
     }
   }
 
   /**
-   * Download skill from any GitHub repo
+   * Create a skill from a custom GitHub URL
+   */
+  createSkillFromUrl(url: string): Skill | null {
+    // Parse GitHub URL formats:
+    // https://github.com/owner/repo
+    // https://github.com/owner/repo/tree/branch/path/to/skill
+    
+    const simpleMatch = url.match(/github\.com\/([^/]+)\/([^/]+)\/?$/)
+    if (simpleMatch) {
+      const [, owner, repo] = simpleMatch
+      return {
+        name: repo.replace(/\.git$/, ''),
+        description: `Custom skill from ${owner}/${repo}`,
+        repoUrl: `https://github.com/${owner}/${repo}`,
+        author: owner
+      }
+    }
+
+    const treeMatch = url.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/[^/]+\/(.+)/)
+    if (treeMatch) {
+      const [, owner, repo, path] = treeMatch
+      const skillName = path.split('/').pop() || repo
+      return {
+        name: skillName,
+        description: `Custom skill from ${owner}/${repo}`,
+        repoUrl: `https://github.com/${owner}/${repo}`,
+        skillPath: path,
+        author: owner
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Download skill from GitHub repo to destination path
    */
   async downloadSkill(skill: Skill, destPath: string): Promise<void> {
     // Parse GitHub URL to extract owner/repo
@@ -199,6 +176,51 @@ export class SkillManager {
     if (!found) {
       throw new Error('No files found in repository archive')
     }
+  }
+
+  private fetchJson(url: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const request = net.request(url)
+      request.setHeader('User-Agent', 'Hector-Studio')
+      request.setHeader('Accept', 'application/vnd.github.v3+json')
+      
+      let data = ''
+      request.on('response', (response) => {
+        if (response.statusCode && response.statusCode >= 400) {
+          reject(new Error(`HTTP ${response.statusCode}`))
+          return
+        }
+        response.on('data', (chunk) => { data += chunk.toString() })
+        response.on('end', () => {
+          try {
+            resolve(JSON.parse(data))
+          } catch (e) {
+            reject(e)
+          }
+        })
+      })
+      request.on('error', reject)
+      request.end()
+    })
+  }
+
+  private fetchText(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const request = net.request(url)
+      request.setHeader('User-Agent', 'Hector-Studio')
+      
+      let data = ''
+      request.on('response', (response) => {
+        if (response.statusCode && response.statusCode >= 400) {
+          reject(new Error(`HTTP ${response.statusCode}`))
+          return
+        }
+        response.on('data', (chunk) => { data += chunk.toString() })
+        response.on('end', () => resolve(data))
+      })
+      request.on('error', reject)
+      request.end()
+    })
   }
 
   private downloadFile(url: string, dest: string): Promise<void> {
