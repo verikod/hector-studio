@@ -141,12 +141,16 @@ export function registerIPCHandlers(): void {
     return skillManager.listSkills()
   })
 
-  ipcMain.handle('skills:search', async (_, query: string) => {
-    return skillManager.searchSkills(query)
+  ipcMain.handle('skills:browse', async (_, { page, limit }: { page?: number, limit?: number }) => {
+    return skillManager.browsePopular(page || 1, limit || 20)
   })
 
-  ipcMain.handle('skills:ai-search', async (_, query: string) => {
-    return skillManager.aiSearchSkills(query)
+  ipcMain.handle('skills:search', async (_, { query, page, limit }: { query: string, page?: number, limit?: number }) => {
+    return skillManager.searchSkills(query, page || 1, limit || 20)
+  })
+
+  ipcMain.handle('skills:ai-search', async (_, { query, page, limit }: { query: string, page?: number, limit?: number }) => {
+    return skillManager.aiSearchSkills(query, page || 1, limit || 20)
   })
 
   // Workspaces feature toggle - delegates to centralized stateCoordinator

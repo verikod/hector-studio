@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { Search, FolderPlus, Download, Check, Loader2, FileCode, Sparkles } from 'lucide-react';
+import { Search, FolderPlus, Download, Check, Loader2, FileCode, Sparkles, Star, ChevronDown } from 'lucide-react';
 import { Input } from './ui/input';
 import { cn } from '../lib/utils';
 import { useServersStore } from '../store/serversStore';
@@ -14,7 +14,18 @@ interface Skill {
     skillPath?: string;
     author: string;
     category?: string;
-    source: 'skillsmp' | 'official' | 'local';
+    stars?: number;
+    source: 'skillsmp' | 'local';
+}
+
+interface SkillSearchResult {
+    skills: Skill[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        hasNext: boolean;
+    };
 }
 
 interface CreateWorkspaceModalProps {
@@ -25,18 +36,21 @@ interface CreateWorkspaceModalProps {
 export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModalProps) {
     const [skills, setSkills] = useState<Skill[]>([]);
     const [loading, setLoading] = useState(false);
-    const [searching, setSearching] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [creating, setCreating] = useState(false);
     const [useAI, setUseAI] = useState(false);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [total, setTotal] = useState(0);
     const { addServer, selectServer } = useServersStore();
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Load official skills on open
+    // Load popular skills on open
     useEffect(() => {
         if (open) {
-            loadOfficialSkills();
+            loadPopularSkills();
         }
     }, [open]);
 
@@ -47,25 +61,16 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
         }
 
         if (!searchQuery.trim()) {
-            // If search is cleared, show official skills
-            loadOfficialSkills();
+            // If search is cleared, show popular skills
+            loadPopularSkills();
             return;
         }
 
-        setSearching(true);
+        setLoading(true);
+        setPage(1);
         searchTimeoutRef.current = setTimeout(async () => {
-            try {
-                const api = (window as any).api;
-                const results = useAI
-                    ? await api.skills.aiSearch(searchQuery)
-                    : await api.skills.search(searchQuery);
-                setSkills(results);
-            } catch (e) {
-                console.error('Search failed:', e);
-            } finally {
-                setSearching(false);
-            }
-        }, 500); // 500ms debounce
+            await performSearch(searchQuery, 1, false);
+        }, 500);
 
         return () => {
             if (searchTimeoutRef.current) {
@@ -74,15 +79,63 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
         };
     }, [searchQuery, useAI]);
 
-    const loadOfficialSkills = async () => {
+    const loadPopularSkills = async () => {
         setLoading(true);
+        setPage(1);
         try {
-            const list = await (window as any).api.skills.list();
-            setSkills(list);
+            const api = (window as any).api;
+            const result: SkillSearchResult = await api.skills.browse(1, 20);
+            setSkills(result.skills);
+            setHasMore(result.pagination.hasNext);
+            setTotal(result.pagination.total);
         } catch (e) {
             console.error('Failed to load skills', e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const performSearch = async (query: string, pageNum: number, append: boolean) => {
+        try {
+            const api = (window as any).api;
+            const result: SkillSearchResult = useAI
+                ? await api.skills.aiSearch(query, pageNum, 20)
+                : await api.skills.search(query, pageNum, 20);
+
+            if (append) {
+                setSkills(prev => [...prev, ...result.skills]);
+            } else {
+                setSkills(result.skills);
+            }
+            setHasMore(result.pagination.hasNext);
+            setTotal(result.pagination.total);
+            setPage(pageNum);
+        } catch (e) {
+            console.error('Search failed:', e);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+
+    const loadMore = async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        const nextPage = page + 1;
+        if (searchQuery.trim()) {
+            await performSearch(searchQuery, nextPage, true);
+        } else {
+            try {
+                const api = (window as any).api;
+                const result: SkillSearchResult = await api.skills.browse(nextPage, 20);
+                setSkills(prev => [...prev, ...result.skills]);
+                setHasMore(result.pagination.hasNext);
+                setPage(nextPage);
+            } catch (e) {
+                console.error('Failed to load more', e);
+            } finally {
+                setLoadingMore(false);
+            }
         }
     };
 
@@ -135,18 +188,29 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
         }
     };
 
+    const formatStars = (stars?: number) => {
+        if (!stars) return null;
+        if (stars >= 1000) return `${(stars / 1000).toFixed(1)}k`;
+        return stars.toString();
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl h-[600px] flex flex-col bg-gray-900 border-gray-800 text-gray-100 p-0 overflow-hidden">
+            <DialogContent className="max-w-3xl h-[650px] flex flex-col bg-gray-900 border-gray-800 text-gray-100 p-0 overflow-hidden">
                 <div className="p-6 pb-2">
                     <DialogHeader>
-                        <DialogTitle>Create Workspace</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            Create Workspace
+                            <span className="text-xs font-normal text-gray-500">
+                                {total > 0 && `${total.toLocaleString()} skills available`}
+                            </span>
+                        </DialogTitle>
                     </DialogHeader>
                 </div>
 
                 <Tabs defaultValue="template" className="flex-1 flex flex-col min-h-0 p-6 pt-0 overflow-hidden">
                     <TabsList className="grid w-full grid-cols-2 bg-black/40 border border-white/10 mb-4 shrink-0">
-                        <TabsTrigger value="template">From Skill / Template</TabsTrigger>
+                        <TabsTrigger value="template">From Skill</TabsTrigger>
                         <TabsTrigger value="blank">Blank Workspace</TabsTrigger>
                     </TabsList>
 
@@ -155,7 +219,7 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
                             <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                                 <Input
-                                    placeholder="Search 25,000+ skills (e.g. React, PDF, Research)..."
+                                    placeholder="Search skills..."
                                     className="pl-9 bg-black/20 border-white/10"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -175,58 +239,85 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
                             </Button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto min-h-0 pr-2 -mr-2 space-y-3">
-                            {loading || searching ? (
+                        <div className="flex-1 overflow-y-auto min-h-0 pr-2 -mr-2">
+                            {loading ? (
                                 <div className="flex items-center justify-center h-40 text-gray-500">
                                     <Loader2 className="animate-spin mr-2" />
-                                    {searching ? 'Searching SkillsMP...' : 'Loading skills...'}
+                                    Loading skills...
                                 </div>
                             ) : skills.length === 0 ? (
                                 <div className="text-center py-10 text-gray-500">
                                     {searchQuery ? 'No skills found. Try a different search.' : 'No skills available.'}
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 gap-3">
-                                    {skills.map((skill, index) => (
-                                        <div
-                                            key={`${skill.name}-${index}`}
-                                            className={cn(
-                                                "p-4 rounded-lg border cursor-pointer transition-all hover:bg-white/5 relative",
-                                                selectedSkill?.name === skill.name && selectedSkill?.repoUrl === skill.repoUrl
-                                                    ? "border-green-500 bg-green-500/10 hover:bg-green-500/10"
-                                                    : "border-white/10 bg-black/20"
-                                            )}
-                                            onClick={() => setSelectedSkill(skill)}
-                                        >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="p-2 rounded bg-white/5">
-                                                    <FileCode size={20} className={skill.source === 'official' ? 'text-green-400' : 'text-blue-400'} />
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {skills.map((skill, index) => (
+                                            <div
+                                                key={`${skill.name}-${skill.repoUrl}-${index}`}
+                                                className={cn(
+                                                    "p-4 rounded-lg border cursor-pointer transition-all hover:bg-white/5 relative",
+                                                    selectedSkill?.name === skill.name && selectedSkill?.repoUrl === skill.repoUrl
+                                                        ? "border-green-500 bg-green-500/10 hover:bg-green-500/10"
+                                                        : "border-white/10 bg-black/20"
+                                                )}
+                                                onClick={() => setSelectedSkill(skill)}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="p-2 rounded bg-white/5">
+                                                        <FileCode size={20} className="text-blue-400" />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {skill.stars !== undefined && skill.stars > 0 && (
+                                                            <span className="flex items-center gap-1 text-[10px] text-yellow-500">
+                                                                <Star size={10} fill="currentColor" />
+                                                                {formatStars(skill.stars)}
+                                                            </span>
+                                                        )}
+                                                        {selectedSkill?.name === skill.name && selectedSkill?.repoUrl === skill.repoUrl && (
+                                                            <Check size={16} className="text-green-500 bg-green-500/20 rounded-full p-0.5" />
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                {selectedSkill?.name === skill.name && selectedSkill?.repoUrl === skill.repoUrl && (
-                                                    <Check size={16} className="text-green-500 bg-green-500/20 rounded-full p-0.5" />
-                                                )}
-                                            </div>
-                                            <h3 className="font-medium text-sm mb-1">{skill.name}</h3>
-                                            <p className="text-xs text-gray-400 line-clamp-2">{skill.description}</p>
-                                            <div className="mt-3 flex items-center justify-between">
-                                                <span className="text-[10px] text-gray-500 font-mono">
-                                                    by {skill.author}
-                                                </span>
-                                                {skill.category && (
-                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400">
-                                                        {skill.category}
+                                                <h3 className="font-medium text-sm mb-1 truncate">{skill.name}</h3>
+                                                <p className="text-xs text-gray-400 line-clamp-2">{skill.description}</p>
+                                                <div className="mt-3 flex items-center justify-between">
+                                                    <span className="text-[10px] text-gray-500 font-mono truncate">
+                                                        {skill.author}
                                                     </span>
-                                                )}
+                                                </div>
                                             </div>
+                                        ))}
+                                    </div>
+
+                                    {hasMore && (
+                                        <div className="flex justify-center pt-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={loadMore}
+                                                disabled={loadingMore}
+                                                className="bg-black/20 border-white/10 hover:bg-white/10"
+                                            >
+                                                {loadingMore ? (
+                                                    <Loader2 className="animate-spin mr-2" size={14} />
+                                                ) : (
+                                                    <ChevronDown className="mr-2" size={14} />
+                                                )}
+                                                Load More
+                                            </Button>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             )}
                         </div>
 
                         <div className="flex justify-between items-center pt-4 border-t border-white/10 shrink-0">
                             <span className="text-xs text-gray-500">
-                                {searchQuery ? `Found ${skills.length} skills` : `${skills.length} official skills`}
+                                {searchQuery
+                                    ? `Showing ${skills.length} of ${total.toLocaleString()} results`
+                                    : `Popular skills • Sorted by stars`
+                                }
                             </span>
                             <Button
                                 variant="default"

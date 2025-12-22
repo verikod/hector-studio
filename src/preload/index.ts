@@ -41,8 +41,9 @@ const api = {
   // Skills Management
   skills: {
     list: () => ipcRenderer.invoke('skills:list'),
-    search: (query: string) => ipcRenderer.invoke('skills:search', query),
-    aiSearch: (query: string) => ipcRenderer.invoke('skills:ai-search', query)
+    browse: (page?: number, limit?: number) => ipcRenderer.invoke('skills:browse', { page, limit }),
+    search: (query: string, page?: number, limit?: number) => ipcRenderer.invoke('skills:search', { query, page, limit }),
+    aiSearch: (query: string, page?: number, limit?: number) => ipcRenderer.invoke('skills:ai-search', { query, page, limit })
   },
 
   // Workspaces Feature Toggle

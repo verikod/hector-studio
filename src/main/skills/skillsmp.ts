@@ -10,22 +10,46 @@ export interface SkillsMPSkill {
   id: string
   name: string
   description: string
-  githubUrl: string         // Full GitHub URL (API returns githubUrl not repo_url)
+  githubUrl: string
+  skillUrl?: string
   category?: string
   stars?: number
   author?: string
   updatedAt?: number
 }
 
+export interface SkillsMPPagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface SkillsMPSearchResult {
+  skills: SkillsMPSkill[]
+  pagination: SkillsMPPagination
+}
+
 interface SkillsMPResponse {
   success: boolean
   data?: {
     skills: SkillsMPSkill[]
+    pagination?: SkillsMPPagination
   }
   error?: {
     code: string
     message: string
   }
+}
+
+export interface SearchOptions {
+  query?: string        // Search query (use '*' for browse all)
+  page?: number         // Page number (default: 1)
+  limit?: number        // Results per page (default: 20)
+  sortBy?: 'stars' | 'recent' | 'relevance'  // Sort order
+  useAI?: boolean       // Use AI semantic search
 }
 
 /**
@@ -34,6 +58,7 @@ interface SkillsMPResponse {
 function fetchSkillsMP(endpoint: string): Promise<SkillsMPResponse> {
   return new Promise((resolve, reject) => {
     const url = `${SKILLSMP_API_URL}${endpoint}`
+    console.log('[SkillsMP] Fetching:', url)
     const request = net.request(url)
     
     request.setHeader('Authorization', `Bearer ${SKILLSMP_API_KEY}`)
@@ -64,35 +89,54 @@ function fetchSkillsMP(endpoint: string): Promise<SkillsMPResponse> {
 }
 
 /**
- * Search skills using keywords
- * @param query - Search query string
- * @returns Array of matching skills
+ * Search or browse skills with pagination
  */
-export async function searchSkills(query: string): Promise<SkillsMPSkill[]> {
+export async function searchSkills(options: SearchOptions = {}): Promise<SkillsMPSearchResult> {
+  const {
+    query = '*',
+    page = 1,
+    limit = 20,
+    sortBy = 'stars',
+    useAI = false
+  } = options
+
   const encodedQuery = encodeURIComponent(query)
-  const response = await fetchSkillsMP(`/skills/search?q=${encodedQuery}`)
+  const endpoint = useAI ? '/skills/ai-search' : '/skills/search'
+  const params = `q=${encodedQuery}&page=${page}&limit=${limit}&sortBy=${sortBy}`
+  
+  const response = await fetchSkillsMP(`${endpoint}?${params}`)
   
   if (!response.success) {
     console.error('SkillsMP search error:', response.error)
-    return []
+    return {
+      skills: [],
+      pagination: { page: 1, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }
+    }
   }
   
-  return response.data?.skills || []
+  return {
+    skills: response.data?.skills || [],
+    pagination: response.data?.pagination || { page: 1, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }
+  }
+}
+
+/**
+ * Browse popular skills (default view)
+ */
+export async function browsePopular(page: number = 1, limit: number = 20): Promise<SkillsMPSearchResult> {
+  return searchSkills({ query: '*', page, limit, sortBy: 'stars' })
+}
+
+/**
+ * Search skills using keywords
+ */
+export async function keywordSearch(query: string, page: number = 1, limit: number = 20): Promise<SkillsMPSearchResult> {
+  return searchSkills({ query, page, limit, sortBy: 'relevance' })
 }
 
 /**
  * Search skills using AI semantic search
- * @param query - Natural language query
- * @returns Array of semantically matching skills
  */
-export async function aiSearchSkills(query: string): Promise<SkillsMPSkill[]> {
-  const encodedQuery = encodeURIComponent(query)
-  const response = await fetchSkillsMP(`/skills/ai-search?q=${encodedQuery}`)
-  
-  if (!response.success) {
-    console.error('SkillsMP AI search error:', response.error)
-    return []
-  }
-  
-  return response.data?.skills || []
+export async function aiSearch(query: string, page: number = 1, limit: number = 20): Promise<SkillsMPSearchResult> {
+  return searchSkills({ query, page, limit, useAI: true })
 }

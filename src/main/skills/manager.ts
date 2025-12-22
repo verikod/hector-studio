@@ -4,22 +4,34 @@ import { createWriteStream, mkdirSync, existsSync, writeFileSync } from 'fs'
 import { pipeline } from 'stream'
 import AdmZip from 'adm-zip'
 import { app } from 'electron'
-import { searchSkills as skillsMPSearch, aiSearchSkills as skillsMPAISearch, SkillsMPSkill } from './skillsmp'
+import { 
+  browsePopular, 
+  keywordSearch, 
+  aiSearch, 
+  SkillsMPSkill, 
+  SkillsMPSearchResult 
+} from './skillsmp'
 
 export interface Skill {
   name: string
   description: string
-  repoUrl: string         // Full GitHub repo URL (e.g., https://github.com/user/repo)
-  skillPath?: string      // Path within repo (e.g., "skills/react") - optional for single-skill repos
+  repoUrl: string         // Full GitHub repo URL
+  skillPath?: string      // Path within repo (for tree URLs)
   author: string
   category?: string
-  source: 'skillsmp' | 'official' | 'local'
+  stars?: number
+  source: 'skillsmp' | 'local'
 }
 
-// Official Anthropic skills repo (fallback/featured)
-const ANTHROPIC_REPO_OWNER = 'anthropics'
-const ANTHROPIC_REPO_NAME = 'skills'
-const ANTHROPIC_SKILLS_PATH = 'skills'
+export interface SkillSearchResult {
+  skills: Skill[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    hasNext: boolean
+  }
+}
 
 export class SkillManager {
   private cachePath: string
@@ -32,110 +44,98 @@ export class SkillManager {
   }
 
   /**
-   * Search skills using SkillsMP keyword search
+   * Browse popular skills (default view - sorted by stars)
    */
-  async searchSkills(query: string): Promise<Skill[]> {
+  async browsePopular(page: number = 1, limit: number = 20): Promise<SkillSearchResult> {
     try {
-      const results = await skillsMPSearch(query)
-      return this.mapSkillsMPResults(results)
+      const result = await browsePopular(page, limit)
+      return this.mapSearchResult(result)
+    } catch (error) {
+      console.error('Failed to browse skills:', error)
+      return this.emptyResult()
+    }
+  }
+
+  /**
+   * Search skills using keywords
+   */
+  async searchSkills(query: string, page: number = 1, limit: number = 20): Promise<SkillSearchResult> {
+    try {
+      const result = await keywordSearch(query, page, limit)
+      return this.mapSearchResult(result)
     } catch (error) {
       console.error('SkillsMP search failed:', error)
-      return []
+      return this.emptyResult()
     }
   }
 
   /**
-   * Search skills using SkillsMP AI semantic search
+   * Search skills using AI semantic search
    */
-  async aiSearchSkills(query: string): Promise<Skill[]> {
+  async aiSearchSkills(query: string, page: number = 1, limit: number = 20): Promise<SkillSearchResult> {
     try {
-      const results = await skillsMPAISearch(query)
-      return this.mapSkillsMPResults(results)
+      const result = await aiSearch(query, page, limit)
+      return this.mapSearchResult(result)
     } catch (error) {
       console.error('SkillsMP AI search failed:', error)
-      return []
+      return this.emptyResult()
     }
   }
 
   /**
-   * Map SkillsMP API results to our Skill interface
-   */
-  private mapSkillsMPResults(results: SkillsMPSkill[]): Skill[] {
-    return results.map(r => ({
-      name: r.name,
-      description: r.description || `Skill from ${r.author || 'community'}`,
-      repoUrl: r.githubUrl,
-      author: r.author || 'unknown',
-      category: r.category,
-      source: 'skillsmp' as const
-    }))
-  }
-
-  /**
-   * List official Anthropic skills (fallback/featured)
-   */
-  async listOfficialSkills(): Promise<Skill[]> {
-    try {
-      const response = await this.fetchJson(
-        `https://api.github.com/repos/${ANTHROPIC_REPO_OWNER}/${ANTHROPIC_REPO_NAME}/contents/${ANTHROPIC_SKILLS_PATH}`
-      )
-      
-      if (!Array.isArray(response)) {
-        return []
-      }
-
-      return response
-        .filter((item: any) => item.type === 'dir')
-        .map((item: any) => ({
-          name: item.name,
-          description: `Official skill from Anthropic`,
-          repoUrl: `https://github.com/${ANTHROPIC_REPO_OWNER}/${ANTHROPIC_REPO_NAME}`,
-          skillPath: item.path,
-          author: ANTHROPIC_REPO_OWNER,
-          source: 'official' as const
-        }))
-    } catch (error) {
-      console.error('Failed to list official skills:', error)
-      return []
-    }
-  }
-
-  /**
-   * Legacy listSkills - now returns official skills for backward compatibility
+   * Legacy listSkills - now returns popular skills for backward compatibility
    */
   async listSkills(): Promise<Skill[]> {
-    return this.listOfficialSkills()
+    const result = await this.browsePopular(1, 20)
+    return result.skills
   }
 
-  // fetchJson helper using Electron net
-  private fetchJson(url: string): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const request = net.request(url)
-      request.setHeader('User-Agent', 'Hector-Studio')
-      
-      request.on('response', (response) => {
-        let data = ''
-        response.on('data', (chunk) => {
-          data += chunk.toString()
-        })
-        response.on('end', () => {
-          try {
-            resolve(JSON.parse(data))
-          } catch (e) {
-            reject(e)
-          }
-        })
-      })
-      request.on('error', reject)
-      request.end()
-    })
+  private mapSearchResult(result: SkillsMPSearchResult): SkillSearchResult {
+    return {
+      skills: result.skills.map(r => this.mapSkill(r)),
+      pagination: {
+        page: result.pagination.page,
+        limit: result.pagination.limit,
+        total: result.pagination.total,
+        hasNext: result.pagination.hasNext
+      }
+    }
+  }
+
+  private mapSkill(r: SkillsMPSkill): Skill {
+    // Parse GitHub URL to extract skill path for tree URLs
+    // e.g., https://github.com/user/repo/tree/main/path/to/skill
+    let repoUrl = r.githubUrl
+    let skillPath: string | undefined
+
+    const treeMatch = r.githubUrl.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/[^/]+\/(.+)/)
+    if (treeMatch) {
+      const [, owner, repo, path] = treeMatch
+      repoUrl = `https://github.com/${owner}/${repo}`
+      skillPath = path
+    }
+
+    return {
+      name: r.name,
+      description: r.description || `Skill from ${r.author || 'community'}`,
+      repoUrl,
+      skillPath,
+      author: r.author || 'unknown',
+      category: r.category,
+      stars: r.stars,
+      source: 'skillsmp'
+    }
+  }
+
+  private emptyResult(): SkillSearchResult {
+    return {
+      skills: [],
+      pagination: { page: 1, limit: 20, total: 0, hasNext: false }
+    }
   }
 
   /**
    * Download skill from any GitHub repo
-   * Supports both:
-   * - Full repo skills (skill at root)
-   * - Subpath skills (skill in a subdirectory like anthropics/skills)
    */
   async downloadSkill(skill: Skill, destPath: string): Promise<void> {
     // Parse GitHub URL to extract owner/repo
@@ -163,34 +163,28 @@ export class SkillManager {
     const skillPathPrefix = skill.skillPath ? `${skill.skillPath}/` : ''
     
     for (const entry of zipEntries) {
-      // Entry name includes root folder, e.g. "owner-repo-hash/path/to/file"
       const parts = entry.entryName.split('/')
       if (parts.length < 2) continue
       
-      // Remove the root folder (owner-repo-hash)
       const internalPath = parts.slice(1).join('/')
       
-      // If skillPath is specified, only extract that subdirectory
-      // If not specified, extract everything (root skill)
       const shouldExtract = skillPathPrefix 
         ? internalPath.startsWith(skillPathPrefix)
         : true
       
       if (!shouldExtract) continue
       
-      // Calculate relative path for destination
       const relativePath = skillPathPrefix 
         ? internalPath.replace(skillPathPrefix, '')
         : internalPath
       
-      if (!relativePath) continue // Skip the skill folder itself
+      if (!relativePath) continue
       
       if (entry.isDirectory) {
         mkdirSync(join(destPath, relativePath), { recursive: true })
         continue
       }
       
-      // Extract file
       const targetPath = join(destPath, relativePath)
       const fileDir = join(destPath, relativePath.substring(0, relativePath.lastIndexOf('/') + 1))
       mkdirSync(fileDir, { recursive: true })
