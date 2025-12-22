@@ -141,6 +141,14 @@ export function registerIPCHandlers(): void {
     return skillManager.listSkills()
   })
 
+  ipcMain.handle('skills:search', async (_, query: string) => {
+    return skillManager.searchSkills(query)
+  })
+
+  ipcMain.handle('skills:ai-search', async (_, query: string) => {
+    return skillManager.aiSearchSkills(query)
+  })
+
   // Workspaces feature toggle - delegates to centralized stateCoordinator
   ipcMain.handle('workspaces:is-enabled', () => {
     return serverManager.getWorkspacesEnabled()
