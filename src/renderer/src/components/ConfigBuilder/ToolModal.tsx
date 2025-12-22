@@ -9,13 +9,13 @@ const TOOL_TYPES = [
 ];
 
 const FUNCTION_HANDLERS = [
-    { value: 'read_file', label: 'read_file - Read file contents' },
-    { value: 'write_file', label: 'write_file - Write to file' },
+    { value: 'text_editor', label: 'text_editor - View and modify files' },
     { value: 'grep_search', label: 'grep_search - Search files with regex' },
-    { value: 'search_replace', label: 'search_replace - Find and replace' },
     { value: 'apply_patch', label: 'apply_patch - Apply code patch' },
-    { value: 'web_request', label: 'web_request - Make HTTP requests' },
-    { value: 'todo_write', label: 'todo_write - Task management' },
+    { value: 'web_search', label: 'web_search - Internet Search (Tavily)' },
+    { value: 'web_fetch', label: 'web_fetch - Fetch URL Content' },
+    { value: 'web_request', label: 'web_request - Generic HTTP requests' },
+    { value: 'todo', label: 'todo - Task management' },
 ];
 
 const MCP_TRANSPORTS = [
@@ -164,7 +164,7 @@ export const ToolModal: React.FC<ToolModalProps> = ({
                 <TextInput
                     value={id}
                     onChange={setId}
-                    placeholder="e.g., weather, execute_command"
+                    placeholder="e.g., weather, bash"
                 />
             </FormField>
 
@@ -237,7 +237,7 @@ export const ToolModal: React.FC<ToolModalProps> = ({
                         <TextInput
                             value={filter}
                             onChange={setFilter}
-                            placeholder="read_file, list_files"
+                            placeholder="text_editor, list_files"
                         />
                     </FormField>
                 </>
