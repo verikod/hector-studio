@@ -13,7 +13,7 @@ export interface Skill {
   author: string
 }
 
-const ANTHROPIC_SKILLS_REPO = 'anthropics/claude-code-skills'
+const ANTHROPIC_SKILLS_REPO = 'anthropics/skills'
 const ANTHROPIC_SKILLS_PATH = 'skills'
 
 export class SkillManager {
