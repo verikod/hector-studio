@@ -5,20 +5,23 @@ import { net } from 'electron'
 const SKILLSMP_API_URL = 'https://skillsmp.com/api/v1'
 const SKILLSMP_API_KEY = 'sk_live_skillsmp_-i_fPp3aHl4FXkGuL1aUB3KY61wTFsfFFyArNzd6JeM'
 
-// Response types based on SkillsMP API
+// Response types based on SkillsMP API (actual response structure)
 export interface SkillsMPSkill {
+  id: string
   name: string
   description: string
-  repo_url: string        // Full GitHub URL
-  category: string
+  githubUrl: string         // Full GitHub URL (API returns githubUrl not repo_url)
+  category?: string
   stars?: number
   author?: string
-  updated_at?: string
+  updatedAt?: number
 }
 
 interface SkillsMPResponse {
   success: boolean
-  data?: SkillsMPSkill[]
+  data?: {
+    skills: SkillsMPSkill[]
+  }
   error?: {
     code: string
     message: string
@@ -74,7 +77,7 @@ export async function searchSkills(query: string): Promise<SkillsMPSkill[]> {
     return []
   }
   
-  return response.data || []
+  return response.data?.skills || []
 }
 
 /**
@@ -91,5 +94,5 @@ export async function aiSearchSkills(query: string): Promise<SkillsMPSkill[]> {
     return []
   }
   
-  return response.data || []
+  return response.data?.skills || []
 }

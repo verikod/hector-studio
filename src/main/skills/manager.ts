@@ -64,7 +64,7 @@ export class SkillManager {
     return results.map(r => ({
       name: r.name,
       description: r.description || `Skill from ${r.author || 'community'}`,
-      repoUrl: r.repo_url,
+      repoUrl: r.githubUrl,
       author: r.author || 'unknown',
       category: r.category,
       source: 'skillsmp' as const
