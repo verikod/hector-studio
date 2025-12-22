@@ -408,16 +408,13 @@ export const StudioMode: React.FC = () => {
           </div>
 
           {/* Right: Settings */}
-          <div className="flex items-center gap-2 min-w-[200px] justify-end">
-            <span className="text-gray-600">
-              {showLeft && <span>{designView.toUpperCase()}</span>}
-            </span>
+          <div className="flex items-center justify-end">
             <button
               onClick={() => setShowSettings(true)}
-              className="p-1 text-gray-500 hover:text-white hover:bg-white/10 rounded transition-colors"
-              title="Settings"
+              className="flex items-center gap-1.5 px-2 py-1 text-gray-500 hover:text-white hover:bg-white/10 rounded transition-colors"
             >
               <Settings size={14} />
+              <span className="text-xs">Settings</span>
             </button>
           </div>
         </div>

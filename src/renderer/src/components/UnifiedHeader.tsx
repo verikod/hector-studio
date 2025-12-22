@@ -90,13 +90,14 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
         <>
             <header className="flex-shrink-0 h-12 bg-black/60 border-b border-white/10 flex items-center px-4 justify-between backdrop-blur-md z-50">
                 {/* Left: Branding */}
-                <div className="flex items-center gap-3 select-none min-w-[120px]">
+                <div className="flex items-center gap-2 select-none">
                     <img src={hectorIcon} alt="Hector" className="w-5 h-5 object-contain" />
-                    <span className="font-bold tracking-widest text-xs text-white">HECTOR</span>
+                    <span className="font-bold tracking-wide text-sm text-white">Hector Studio</span>
+                    <span className="text-[10px] text-gray-500 font-mono">v0.1.5</span>
                 </div>
 
                 {/* Center: Server Selection */}
-                <div className="absolute left-1/2 -translate-x-1/2">
+                <div className="flex-1 flex justify-center px-4">
                     <ServerSelector
                         onLoginRequest={onLoginRequest}
                         onLogoutRequest={onLogoutRequest}
@@ -105,7 +106,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                 </div>
 
                 {/* Right: Workspace Actions + Deploy */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-3">
                     {/* Workspace-only actions */}
                     {activeServer?.config.isLocal && (
                         <>
