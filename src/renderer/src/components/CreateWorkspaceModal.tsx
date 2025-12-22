@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { Search, FolderPlus, Download, Check, Loader2, FileCode } from 'lucide-react';
+import { Search, FolderPlus, Download, Check, Loader2, FileCode, Sparkles } from 'lucide-react';
 import { Input } from './ui/input';
 import { cn } from '../lib/utils';
 import { useServersStore } from '../store/serversStore';
@@ -10,8 +10,11 @@ import { useServersStore } from '../store/serversStore';
 interface Skill {
     name: string;
     description: string;
-    path: string;
+    repoUrl: string;
+    skillPath?: string;
     author: string;
+    category?: string;
+    source: 'skillsmp' | 'official' | 'local';
 }
 
 interface CreateWorkspaceModalProps {
@@ -22,18 +25,56 @@ interface CreateWorkspaceModalProps {
 export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModalProps) {
     const [skills, setSkills] = useState<Skill[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searching, setSearching] = useState(false);
     const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [creating, setCreating] = useState(false);
+    const [useAI, setUseAI] = useState(false);
     const { addServer, selectServer } = useServersStore();
+    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Load official skills on open
     useEffect(() => {
         if (open) {
-            loadSkills();
+            loadOfficialSkills();
         }
     }, [open]);
 
-    const loadSkills = async () => {
+    // Debounced search
+    useEffect(() => {
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        if (!searchQuery.trim()) {
+            // If search is cleared, show official skills
+            loadOfficialSkills();
+            return;
+        }
+
+        setSearching(true);
+        searchTimeoutRef.current = setTimeout(async () => {
+            try {
+                const api = (window as any).api;
+                const results = useAI
+                    ? await api.skills.aiSearch(searchQuery)
+                    : await api.skills.search(searchQuery);
+                setSkills(results);
+            } catch (e) {
+                console.error('Search failed:', e);
+            } finally {
+                setSearching(false);
+            }
+        }, 500); // 500ms debounce
+
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [searchQuery, useAI]);
+
+    const loadOfficialSkills = async () => {
         setLoading(true);
         try {
             const list = await (window as any).api.skills.list();
@@ -94,11 +135,6 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
         }
     };
 
-    const filteredSkills = skills.filter((s) =>
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl h-[600px] flex flex-col bg-gray-900 border-gray-800 text-gray-100 p-0 overflow-hidden">
@@ -115,48 +151,72 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
                     </TabsList>
 
                     <TabsContent value="template" className="flex-1 flex flex-col min-h-0 gap-4 mt-0 overflow-hidden">
-                        <div className="relative shrink-0">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                            <Input
-                                placeholder="Search skills (e.g. React, PDF, Research)..."
-                                className="pl-9 bg-black/20 border-white/10"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+                        <div className="flex gap-2 shrink-0">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                                <Input
+                                    placeholder="Search 25,000+ skills (e.g. React, PDF, Research)..."
+                                    className="pl-9 bg-black/20 border-white/10"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <Button
+                                variant={useAI ? "default" : "outline"}
+                                size="icon"
+                                onClick={() => setUseAI(!useAI)}
+                                className={cn(
+                                    "shrink-0",
+                                    useAI ? "bg-purple-600 hover:bg-purple-700" : "bg-black/20 border-white/10 hover:bg-white/10"
+                                )}
+                                title={useAI ? "AI Search enabled" : "Enable AI Search"}
+                            >
+                                <Sparkles size={16} className={useAI ? "text-white" : "text-gray-400"} />
+                            </Button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto min-h-0 pr-2 -mr-2 space-y-3">
-                            {loading ? (
+                            {loading || searching ? (
                                 <div className="flex items-center justify-center h-40 text-gray-500">
-                                    <Loader2 className="animate-spin mr-2" /> Loading skills...
+                                    <Loader2 className="animate-spin mr-2" />
+                                    {searching ? 'Searching SkillsMP...' : 'Loading skills...'}
                                 </div>
-                            ) : filteredSkills.length === 0 ? (
+                            ) : skills.length === 0 ? (
                                 <div className="text-center py-10 text-gray-500">
-                                    No skills found.
+                                    {searchQuery ? 'No skills found. Try a different search.' : 'No skills available.'}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 gap-3">
-                                    {filteredSkills.map((skill) => (
+                                    {skills.map((skill, index) => (
                                         <div
-                                            key={skill.name}
+                                            key={`${skill.name}-${index}`}
                                             className={cn(
                                                 "p-4 rounded-lg border cursor-pointer transition-all hover:bg-white/5 relative",
-                                                selectedSkill?.name === skill.name ? "border-green-500 bg-green-500/10 hover:bg-green-500/10" : "border-white/10 bg-black/20"
+                                                selectedSkill?.name === skill.name && selectedSkill?.repoUrl === skill.repoUrl
+                                                    ? "border-green-500 bg-green-500/10 hover:bg-green-500/10"
+                                                    : "border-white/10 bg-black/20"
                                             )}
                                             onClick={() => setSelectedSkill(skill)}
                                         >
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="p-2 rounded bg-white/5">
-                                                    <FileCode size={20} className="text-blue-400" />
+                                                    <FileCode size={20} className={skill.source === 'official' ? 'text-green-400' : 'text-blue-400'} />
                                                 </div>
-                                                {selectedSkill?.name === skill.name && (
+                                                {selectedSkill?.name === skill.name && selectedSkill?.repoUrl === skill.repoUrl && (
                                                     <Check size={16} className="text-green-500 bg-green-500/20 rounded-full p-0.5" />
                                                 )}
                                             </div>
                                             <h3 className="font-medium text-sm mb-1">{skill.name}</h3>
                                             <p className="text-xs text-gray-400 line-clamp-2">{skill.description}</p>
-                                            <div className="mt-3 text-[10px] text-gray-500 font-mono">
-                                                by {skill.author}
+                                            <div className="mt-3 flex items-center justify-between">
+                                                <span className="text-[10px] text-gray-500 font-mono">
+                                                    by {skill.author}
+                                                </span>
+                                                {skill.category && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400">
+                                                        {skill.category}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -164,7 +224,10 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
                             )}
                         </div>
 
-                        <div className="flex justify-end pt-4 border-t border-white/10 shrink-0">
+                        <div className="flex justify-between items-center pt-4 border-t border-white/10 shrink-0">
+                            <span className="text-xs text-gray-500">
+                                {searchQuery ? `Found ${skills.length} skills` : `${skills.length} official skills`}
+                            </span>
                             <Button
                                 variant="default"
                                 disabled={!selectedSkill || creating}
