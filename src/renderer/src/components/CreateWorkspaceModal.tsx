@@ -220,7 +220,7 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                                 <Input
                                     placeholder="Search skills..."
-                                    className="pl-9 bg-black/20 border-white/10"
+                                    className="pl-9 bg-black/20 border-white/10 focus:ring-0 focus:border-white/20"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />

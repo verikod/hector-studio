@@ -349,7 +349,7 @@ export const StudioMode: React.FC = () => {
                 isPinned={true}
                 onPinChange={() => { }}
                 onMessageSent={handleMessageSent}
-                hideControls={!isStudioModeEnabled}
+                hideControls={!isStudioModeEnabled || viewMode === 'chat'}
               />
             </div>
           </div>

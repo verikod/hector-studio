@@ -132,6 +132,9 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
         await (window as any).api.server.setActive(id);
         setIsOpen(false);
 
+        // Clear chat context when switching workspaces/servers
+        useStore.getState().createSession();
+
         // Ensure server status is current
         const server = useServersStore.getState().servers[id];
         if (server && (server.status === 'added' || !server.status)) {
@@ -213,7 +216,7 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                     </div>
 
                                     <div className="flex items-center gap-1">
-                                        {/* Local workspaces: Show Logs and Open Folder */}
+                                        {/* Local workspaces: Show Logs, Open Folder, and Delete */}
                                         {server.config.isLocal && (
                                             <>
                                                 <Button
@@ -241,6 +244,15 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                                     title="Open Folder"
                                                 >
                                                     <ExternalLink size={12} />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
+                                                    onClick={(e) => handleRemoveServer(server.config.id, e)}
+                                                    title="Delete Workspace"
+                                                >
+                                                    <Trash2 size={12} />
                                                 </Button>
                                             </>
                                         )}
