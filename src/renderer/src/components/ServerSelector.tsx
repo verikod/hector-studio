@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
-import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen, Terminal, ExternalLink } from 'lucide-react';
+import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import { useLicenseStore } from '../store/licenseStore';
 import { useStore } from '../store/useStore';
@@ -216,45 +216,17 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                     </div>
 
                                     <div className="flex items-center gap-1">
-                                        {/* Local workspaces: Show Logs, Open Folder, and Delete */}
+                                        {/* Local workspaces: Just Delete button */}
                                         {server.config.isLocal && (
-                                            <>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 hover:bg-gray-700"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        window.dispatchEvent(new CustomEvent('open-log-drawer'));
-                                                    }}
-                                                    title="Show Logs"
-                                                >
-                                                    <Terminal size={12} />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 hover:bg-gray-700"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (server.config.workspacePath) {
-                                                            window.api.workspace.openFolder(server.config.workspacePath);
-                                                        }
-                                                    }}
-                                                    title="Open Folder"
-                                                >
-                                                    <ExternalLink size={12} />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
-                                                    onClick={(e) => handleRemoveServer(server.config.id, e)}
-                                                    title="Delete Workspace"
-                                                >
-                                                    <Trash2 size={12} />
-                                                </Button>
-                                            </>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
+                                                onClick={(e) => handleRemoveServer(server.config.id, e)}
+                                                title="Delete Workspace"
+                                            >
+                                                <Trash2 size={12} />
+                                            </Button>
                                         )}
                                         {/* Remote servers: Login/Logout and Delete */}
                                         {!server.config.isLocal && (

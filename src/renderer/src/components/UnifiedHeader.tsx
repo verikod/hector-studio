@@ -1,4 +1,4 @@
-import { Rocket, Settings, DownloadCloud, LayoutTemplate, MessageSquare, Split } from 'lucide-react';
+import { Rocket, Settings, DownloadCloud, LayoutTemplate, MessageSquare, Split, Terminal, FolderOpen } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useServersStore } from '../store/serversStore';
 
@@ -115,6 +115,45 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onOpenSettings,
                     onLogoutRequest={onLogoutRequest}
                     onEnableWorkspaces={onEnableWorkspaces}
                 />
+                {/* Workspace quick actions - only for local workspaces */}
+                {activeServer?.config.isLocal && (
+                    <div className="flex items-center gap-1 ml-2">
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10"
+                                        onClick={() => window.dispatchEvent(new CustomEvent('open-log-drawer'))}
+                                    >
+                                        <Terminal size={16} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Show Logs</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10"
+                                        onClick={() => {
+                                            if (activeServer.config.workspacePath) {
+                                                (window as any).api.workspace.openFolder(activeServer.config.workspacePath);
+                                            }
+                                        }}
+                                    >
+                                        <FolderOpen size={16} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Open Folder</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                )}
             </div>
 
             {/* Center Zone: Workflow Mode */}
