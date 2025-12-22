@@ -370,7 +370,7 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
     activeWorkspaceId = id
     emitWorkspaceStatus(id, 'starting')
 
-    const configPath = join(workspacePath, 'agents.yaml')
+    const configPath = join(workspacePath, '.hector', 'config.yaml')
 
     hectorProcess = spawn(binaryPath, [
         'serve',

@@ -34,7 +34,13 @@ const api = {
     start: (id: string) => ipcRenderer.invoke('workspace:start', id),
     getActive: () => ipcRenderer.invoke('workspace:get-active'),
     createDefault: () => ipcRenderer.invoke('workspace:create-default'),
+    createFromSkill: (name: string, path: string, skill: any) => ipcRenderer.invoke('workspace:create-from-skill', { name, path, skill }),
     openFolder: (path: string) => ipcRenderer.invoke('workspace:open-folder', path)
+  },
+
+  // Skills Management
+  skills: {
+    list: () => ipcRenderer.invoke('skills:list')
   },
 
   // Workspaces Feature Toggle

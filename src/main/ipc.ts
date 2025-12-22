@@ -2,6 +2,7 @@ import { ipcMain, dialog, app, shell } from 'electron'
 import { join } from 'path'
 import { mkdirSync } from 'fs'
 import { serverManager } from './servers/manager'
+import { skillManager } from './skills/manager'
 import { authManager } from './auth/manager'
 import { stateCoordinator } from './state/coordinator'
 import {
@@ -107,6 +108,37 @@ export function registerIPCHandlers(): void {
     }
 
     return workspace
+  })
+
+  ipcMain.handle('workspace:create-from-skill', async (_, { name, path, skill }) => {
+    // 1. Ensure directory exists
+    // mkdirSync is handled by downloadSkill or browse dialog usually? 
+    // Browse dialog only selects. We must ensure exists.
+    mkdirSync(path, { recursive: true })
+
+    console.log('[ipc] Creating workspace from skill:', name, path, skill.name)
+
+    // 2. Download skill contents
+    try {
+        await skillManager.downloadSkill(skill, path)
+    } catch (e) {
+        console.error('Failed to download skill:', e)
+        throw new Error(`Failed to download skill: ${(e as Error).message}`)
+    }
+
+    // 3. Add workspace
+    const workspace = serverManager.addWorkspace(name, path)
+
+    if (workspace) {
+      console.log('[ipc] Starting workspace:', workspace.id)
+      await startWorkspace(workspace)
+    }
+
+    return workspace
+  })
+
+  ipcMain.handle('skills:list', async () => {
+    return skillManager.listSkills()
   })
 
   // Workspaces feature toggle - delegates to centralized stateCoordinator

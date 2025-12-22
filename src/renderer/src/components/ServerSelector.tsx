@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen, Terminal, ExternalLink } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import { useLicenseStore } from '../store/licenseStore';
@@ -27,6 +28,7 @@ interface ServerSelectorProps {
 
 export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorkspaces }: ServerSelectorProps) {
     const [showAddForm, setShowAddForm] = useState(false);
+    const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
     const [newName, setNewName] = useState('');
     const [newUrl, setNewUrl] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -98,25 +100,11 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                 await (window as any).api.hector.download();
             }
 
-            // Now browse for folder
-            const path = await (window as any).api.workspace.browse();
-            if (!path) return; // User cancelled
-
-            const name = path.split(/[\\/]/).pop() || 'Workspace';
-            const workspace = await (window as any).api.workspace.add(name, path);
-
-            if (workspace) {
-                const { addServer } = useServersStore.getState();
-                addServer(workspace);
-
-                // Start the new workspace
-                await (window as any).api.workspace.start(workspace.id);
-                selectServer(workspace.id);
-                // Status is handled by backend events (start emits 'running' -> 'authenticated')
-            }
+            // Open creation modal
+            setShowCreateWorkspaceModal(true);
         } catch (error) {
-            console.error('Failed to add workspace:', error);
-            useStore.getState().setError(`Failed to add workspace: ${error}`);
+            console.error('Failed to initiate workspace creation:', error);
+            useStore.getState().setError(`Failed to init workspace: ${error}`);
         }
     };
 
@@ -174,180 +162,186 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
     };
 
     return (
-        <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-            <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-[240px] justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300">
-                    <div className="flex items-center gap-2">
-                        <Server size={14} />
-                        <span className="truncate max-w-[120px]">
-                            {activeServer?.config.name || 'Select Server'}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {activeServer && (
-                            <div className={cn(
-                                "w-2 h-2 rounded-full",
-                                getStatusColor(activeServer.status),
-                                (activeServer.status === 'disconnected' || activeServer.status === 'unreachable') && 'animate-pulse'
-                            )} />
-                        )}
-                        <ChevronDown size={14} className="opacity-50" />
-                    </div>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[240px] bg-gray-900 border-gray-800 text-gray-300">
-                <DropdownMenuLabel>Servers</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-gray-800" />
-                <div className="max-h-[200px] overflow-y-auto">
-                    {serverList.length === 0 ? (
-                        <div className="p-2 text-sm text-center text-gray-500">No servers configured</div>
-                    ) : (
-                        serverList.map((server) => (
-                            <DropdownMenuItem
-                                key={server.config.id}
-                                onSelect={() => handleSelectServer(server.config.id)}
-                                className={cn(
-                                    "flex items-center justify-between cursor-pointer focus:bg-gray-800 focus:text-white",
-                                    activeServerId === server.config.id && "bg-gray-800/50"
-                                )}
-                            >
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                    <div className={cn(
-                                        "w-2 h-2 rounded-full flex-shrink-0",
-                                        getStatusColor(server.status),
-                                        (server.status === 'disconnected' || server.status === 'unreachable') && 'animate-pulse'
-                                    )} />
-                                    <div className="flex flex-col min-w-0">
-                                        <span className="font-medium truncate text-xs">{server.config.name}</span>
-                                        <span className="text-[10px] text-gray-500 truncate">{server.config.url}</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-1">
-                                    {/* Local workspaces: Show Logs and Open Folder */}
-                                    {server.config.isLocal && (
-                                        <>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 hover:bg-gray-700"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    window.dispatchEvent(new CustomEvent('open-log-drawer'));
-                                                }}
-                                                title="Show Logs"
-                                            >
-                                                <Terminal size={12} />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 hover:bg-gray-700"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (server.config.workspacePath) {
-                                                        window.api.workspace.openFolder(server.config.workspacePath);
-                                                    }
-                                                }}
-                                                title="Open Folder"
-                                            >
-                                                <ExternalLink size={12} />
-                                            </Button>
-                                        </>
-                                    )}
-                                    {/* Remote servers: Login/Logout and Delete */}
-                                    {!server.config.isLocal && (
-                                        <>
-                                            {server.status === 'auth_required' && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 hover:bg-gray-700"
-                                                    onClick={(e) => { e.stopPropagation(); onLoginRequest(server.config.id); }}
-                                                >
-                                                    <LogIn size={12} />
-                                                </Button>
-                                            )}
-                                            {server.status === 'authenticated' && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6 hover:bg-gray-700"
-                                                    onClick={(e) => { e.stopPropagation(); onLogoutRequest(server.config.id); }}
-                                                >
-                                                    <LogOut size={12} />
-                                                </Button>
-                                            )}
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
-                                                onClick={(e) => handleRemoveServer(server.config.id, e)}
-                                            >
-                                                <Trash2 size={12} />
-                                            </Button>
-                                        </>
-                                    )}
-                                    {activeServerId === server.config.id && <Check size={14} className="text-green-500 ml-1" />}
-                                </div>
-                            </DropdownMenuItem>
-                        ))
-                    )}
-                </div>
-                <DropdownMenuSeparator className="bg-gray-800" />
-                {showAddForm ? (
-                    <div className="p-2 space-y-2">
-                        <Input
-                            placeholder="Server Name"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            className="h-7 text-xs bg-black/40 border-gray-700"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                        <Input
-                            placeholder="URL"
-                            value={newUrl}
-                            onChange={(e) => setNewUrl(e.target.value)}
-                            className="h-7 text-xs bg-black/40 border-gray-700"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                        <div className="flex gap-2">
-                            <Button size="sm" variant="default" className="h-7 text-xs w-full bg-hector-green hover:bg-hector-green/80 text-white" onClick={handleAddServer}>
-                                Add
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs w-full hover:bg-gray-800" onClick={(e) => { e.stopPropagation(); setShowAddForm(false); }}>
-                                Cancel
-                            </Button>
+        <>
+            <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-[240px] justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300">
+                        <div className="flex items-center gap-2">
+                            <Server size={14} />
+                            <span className="truncate max-w-[120px]">
+                                {activeServer?.config.name || 'Select Server'}
+                            </span>
                         </div>
-                    </div>
-                ) : (
-                    <>
-                        {workspacesEnabled ? (
-                            <DropdownMenuItem
-                                onSelect={() => isLicensed && handleAddWorkspace()}
-                                className={`cursor-pointer focus:bg-gray-800 focus:text-white ${!isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={!isLicensed}
-                            >
-                                <FolderOpen size={14} className="mr-2" />
-                                Add Workspace {!isLicensed && '(License required)'}
-                            </DropdownMenuItem>
+                        <div className="flex items-center gap-2">
+                            {activeServer && (
+                                <div className={cn(
+                                    "w-2 h-2 rounded-full",
+                                    getStatusColor(activeServer.status),
+                                    (activeServer.status === 'disconnected' || activeServer.status === 'unreachable') && 'animate-pulse'
+                                )} />
+                            )}
+                            <ChevronDown size={14} className="opacity-50" />
+                        </div>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[240px] bg-gray-900 border-gray-800 text-gray-300">
+                    <DropdownMenuLabel>Servers</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-gray-800" />
+                    <div className="max-h-[200px] overflow-y-auto">
+                        {serverList.length === 0 ? (
+                            <div className="p-2 text-sm text-center text-gray-500">No servers configured</div>
                         ) : (
-                            <DropdownMenuItem
-                                onSelect={() => isLicensed && onEnableWorkspaces()}
-                                className={`cursor-pointer focus:bg-gray-800 focus:text-white ${!isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={!isLicensed}
-                            >
-                                <FolderOpen size={14} className="mr-2" />
-                                Enable Local Workspaces {!isLicensed && '(License required)'}
-                            </DropdownMenuItem>
+                            serverList.map((server) => (
+                                <DropdownMenuItem
+                                    key={server.config.id}
+                                    onSelect={() => handleSelectServer(server.config.id)}
+                                    className={cn(
+                                        "flex items-center justify-between cursor-pointer focus:bg-gray-800 focus:text-white",
+                                        activeServerId === server.config.id && "bg-gray-800/50"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <div className={cn(
+                                            "w-2 h-2 rounded-full flex-shrink-0",
+                                            getStatusColor(server.status),
+                                            (server.status === 'disconnected' || server.status === 'unreachable') && 'animate-pulse'
+                                        )} />
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="font-medium truncate text-xs">{server.config.name}</span>
+                                            <span className="text-[10px] text-gray-500 truncate">{server.config.url}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                        {/* Local workspaces: Show Logs and Open Folder */}
+                                        {server.config.isLocal && (
+                                            <>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 hover:bg-gray-700"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.dispatchEvent(new CustomEvent('open-log-drawer'));
+                                                    }}
+                                                    title="Show Logs"
+                                                >
+                                                    <Terminal size={12} />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 hover:bg-gray-700"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (server.config.workspacePath) {
+                                                            window.api.workspace.openFolder(server.config.workspacePath);
+                                                        }
+                                                    }}
+                                                    title="Open Folder"
+                                                >
+                                                    <ExternalLink size={12} />
+                                                </Button>
+                                            </>
+                                        )}
+                                        {/* Remote servers: Login/Logout and Delete */}
+                                        {!server.config.isLocal && (
+                                            <>
+                                                {server.status === 'auth_required' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 hover:bg-gray-700"
+                                                        onClick={(e) => { e.stopPropagation(); onLoginRequest(server.config.id); }}
+                                                    >
+                                                        <LogIn size={12} />
+                                                    </Button>
+                                                )}
+                                                {server.status === 'authenticated' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 hover:bg-gray-700"
+                                                        onClick={(e) => { e.stopPropagation(); onLogoutRequest(server.config.id); }}
+                                                    >
+                                                        <LogOut size={12} />
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 hover:bg-red-900/50 hover:text-red-400"
+                                                    onClick={(e) => handleRemoveServer(server.config.id, e)}
+                                                >
+                                                    <Trash2 size={12} />
+                                                </Button>
+                                            </>
+                                        )}
+                                        {activeServerId === server.config.id && <Check size={14} className="text-green-500 ml-1" />}
+                                    </div>
+                                </DropdownMenuItem>
+                            ))
                         )}
-                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowAddForm(true); }} className="cursor-pointer focus:bg-gray-800 focus:text-white">
-                            <Plus size={14} className="mr-2" />
-                            Add Remote Server
-                        </DropdownMenuItem>
-                    </>
-                )}
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    </div>
+                    <DropdownMenuSeparator className="bg-gray-800" />
+                    {showAddForm ? (
+                        <div className="p-2 space-y-2">
+                            <Input
+                                placeholder="Server Name"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                className="h-7 text-xs bg-black/40 border-gray-700"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                            <Input
+                                placeholder="URL"
+                                value={newUrl}
+                                onChange={(e) => setNewUrl(e.target.value)}
+                                className="h-7 text-xs bg-black/40 border-gray-700"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="flex gap-2">
+                                <Button size="sm" variant="default" className="h-7 text-xs w-full bg-hector-green hover:bg-hector-green/80 text-white" onClick={handleAddServer}>
+                                    Add
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 text-xs w-full hover:bg-gray-800" onClick={(e) => { e.stopPropagation(); setShowAddForm(false); }}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            {workspacesEnabled ? (
+                                <DropdownMenuItem
+                                    onSelect={() => isLicensed && handleAddWorkspace()}
+                                    className={`cursor-pointer focus:bg-gray-800 focus:text-white ${!isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={!isLicensed}
+                                >
+                                    <FolderOpen size={14} className="mr-2" />
+                                    Add Workspace {!isLicensed && '(License required)'}
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem
+                                    onSelect={() => isLicensed && onEnableWorkspaces()}
+                                    className={`cursor-pointer focus:bg-gray-800 focus:text-white ${!isLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={!isLicensed}
+                                >
+                                    <FolderOpen size={14} className="mr-2" />
+                                    Enable Local Workspaces {!isLicensed && '(License required)'}
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowAddForm(true); }} className="cursor-pointer focus:bg-gray-800 focus:text-white">
+                                <Plus size={14} className="mr-2" />
+                                Add Remote Server
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <CreateWorkspaceModal
+                open={showCreateWorkspaceModal}
+                onOpenChange={setShowCreateWorkspaceModal}
+            />
+        </>
     );
 }
