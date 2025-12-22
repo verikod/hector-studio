@@ -122,6 +122,14 @@ const api = {
       ipcRenderer.on('app:update-status', handler)
       return () => ipcRenderer.removeListener('app:update-status', handler)
     }
+  },
+
+  // Environment Variables
+  env: {
+    getGlobal: () => ipcRenderer.invoke('env:get-global'),
+    setGlobal: (envVars: Record<string, string>) => ipcRenderer.invoke('env:set-global', envVars),
+    getWorkspace: (id: string) => ipcRenderer.invoke('env:get-workspace', id),
+    setWorkspace: (id: string, envVars: Record<string, string>) => ipcRenderer.invoke('env:set-workspace', { id, envVars })
   }
 }
 

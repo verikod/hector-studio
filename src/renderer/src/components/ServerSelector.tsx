@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
-import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen } from 'lucide-react';
+import { WorkspaceEnvModal } from './WorkspaceEnvModal';
+import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen, Variable } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import { useLicenseStore } from '../store/licenseStore';
 import { useStore } from '../store/useStore';
@@ -29,6 +30,8 @@ interface ServerSelectorProps {
 export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorkspaces }: ServerSelectorProps) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
+    const [showEnvModal, setShowEnvModal] = useState(false);
+    const [envModalWorkspace, setEnvModalWorkspace] = useState<any>(null);
     const [newName, setNewName] = useState('');
     const [newUrl, setNewUrl] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -253,6 +256,23 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                         >
                                             <Trash2 size={12} />
                                         </Button>
+                                        {/* Env vars button for workspaces */}
+                                        {server.config.isLocal && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 hover:bg-blue-500/20"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEnvModalWorkspace(server.config);
+                                                    setShowEnvModal(true);
+                                                    setIsOpen(false);
+                                                }}
+                                                title="Environment Variables"
+                                            >
+                                                <Variable size={12} className="text-blue-400" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </DropdownMenuItem>
                             ))
@@ -318,6 +338,11 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
             <CreateWorkspaceModal
                 open={showCreateWorkspaceModal}
                 onOpenChange={setShowCreateWorkspaceModal}
+            />
+            <WorkspaceEnvModal
+                isOpen={showEnvModal}
+                onClose={() => { setShowEnvModal(false); setEnvModalWorkspace(null); }}
+                workspace={envModalWorkspace}
             />
         </>
     );

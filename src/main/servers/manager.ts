@@ -1,8 +1,7 @@
 import Store from 'electron-store'
 import { v4 as uuidv4 } from 'uuid'
 
-// Base port for local workspaces - each workspace gets next available
-const BASE_PORT = 8080
+
 
 export interface ServerConfig {
   id: string
@@ -12,6 +11,7 @@ export interface ServerConfig {
   isLocal?: boolean       // True for workspace-based local server
   workspacePath?: string  // Absolute path to workspace directory (only for local)
   port?: number           // Port for local server (auto-assigned)
+  envVars?: Record<string, string> // Workspace-scoped environment variables
   auth?: {
     enabled: boolean
     type: string
@@ -87,19 +87,23 @@ export class ServerManager {
     return this.getServers().filter(s => !s.isLocal)
   }
   
+
   /**
-   * Get the next available port for a new workspace.
+   * Find a free port using the OS kernel.
+   * This avoids race conditions and collisions with other apps.
    */
-  getNextAvailablePort(): number {
-    const usedPorts = this.getWorkspaces()
-      .map(s => s.port)
-      .filter((p): p is number => p !== undefined)
-    
-    let port = BASE_PORT
-    while (usedPorts.includes(port)) {
-      port++
-    }
-    return port
+  public async findFreePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      import('net').then(({ createServer }) => {
+        const srv = createServer()
+        srv.unref()
+        srv.on('error', reject)
+        srv.listen(0, () => {
+          const { port } = srv.address() as import('net').AddressInfo
+          srv.close(() => resolve(port))
+        })
+      }).catch(reject)
+    })
   }
 
   /**
@@ -132,9 +136,9 @@ export class ServerManager {
   
   /**
    * Add a workspace (local server).
-   * Auto-assigns a port and creates URL.
+   * Finds a free port dynamically.
    */
-  addWorkspace(name: string, workspacePath: string): ServerConfig {
+  async addWorkspace(name: string, workspacePath: string): Promise<ServerConfig> {
     const servers = this.getServers()
     
     // Check if workspace path already exists
@@ -143,7 +147,7 @@ export class ServerManager {
       throw new Error(`Workspace at ${workspacePath} already exists`)
     }
     
-    const port = this.getNextAvailablePort()
+    const port = await this.findFreePort()
     const url = `http://localhost:${port}`
     
     const newWorkspace: ServerConfig = {

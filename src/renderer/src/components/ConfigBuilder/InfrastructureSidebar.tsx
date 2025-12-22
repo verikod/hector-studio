@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Database, Cpu, Box, Layers, Wrench, Plus, Pencil, Trash2, Shield, FileText } from 'lucide-react';
+import { Database, Cpu, Box, Layers, Wrench, Plus, Pencil, Trash2, Shield, FileText, Variable } from 'lucide-react';
 import type { Node } from '@xyflow/react';
 
 import { parseConfig, updateConfigSection, removeFromConfigSection } from '../../lib/config-utils';
@@ -9,6 +9,7 @@ import { ToolModal } from './ToolModal';
 import { GuardrailModal } from './GuardrailModal';
 import { DatabaseModal, EmbedderModal, VectorStoreModal, DocumentStoreModal } from './OtherModals';
 import { GlobalConfigModal } from './GlobalConfigModal';
+import { GlobalEnvModal } from '../GlobalEnvModal';
 import { useStore } from '../../store/useStore';
 import { Globe } from 'lucide-react';
 
@@ -130,6 +131,7 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
   const [vectorStoreModalOpen, setVectorStoreModalOpen] = useState(false);
   const [documentStoreModalOpen, setDocumentStoreModalOpen] = useState(false);
   const [globalConfigModalOpen, setGlobalConfigModalOpen] = useState(false);
+  const [globalEnvModalOpen, setGlobalEnvModalOpen] = useState(false);
 
   const [editingLLM, setEditingLLM] = useState<{ id: string; config: LLMConfig } | null>(null);
   const [editingTool, setEditingTool] = useState<{ id: string; config: ToolConfig } | null>(null);
@@ -438,13 +440,20 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
       </div>
 
       {/* Global Config */}
-      <div className="flex-none p-2 w-full border-b border-white/10 flex justify-center">
+      <div className="flex-none p-2 w-full border-b border-white/10 flex flex-col gap-1 items-center">
         <button
           onClick={() => setGlobalConfigModalOpen(true)}
           className="p-2 bg-hector-green/10 hover:bg-hector-green/20 text-hector-green border border-hector-green/20 rounded transition-colors"
           title="Global Settings"
         >
           <Globe size={16} />
+        </button>
+        <button
+          onClick={() => setGlobalEnvModalOpen(true)}
+          className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded transition-colors"
+          title="Environment Variables"
+        >
+          <Variable size={16} />
         </button>
       </div>
 
@@ -476,13 +485,20 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
         </div>
       </div>
 
-      <div className="flex-none p-2 border-b border-white/10">
+      <div className="flex-none p-2 border-b border-white/10 space-y-2">
         <button
           onClick={() => setGlobalConfigModalOpen(true)}
           className="w-full flex items-center gap-3 px-3 py-2 bg-hector-green/10 hover:bg-hector-green/20 text-hector-green border border-hector-green/20 rounded transition-colors group"
         >
           <Globe size={16} />
           <span className="text-sm font-medium">Global Settings</span>
+        </button>
+        <button
+          onClick={() => setGlobalEnvModalOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded transition-colors group"
+        >
+          <Variable size={16} />
+          <span className="text-sm font-medium">Environment Variables</span>
         </button>
       </div>
 
@@ -596,6 +612,11 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
       <GlobalConfigModal
         isOpen={globalConfigModalOpen}
         onClose={() => setGlobalConfigModalOpen(false)}
+      />
+
+      <GlobalEnvModal
+        isOpen={globalEnvModalOpen}
+        onClose={() => setGlobalEnvModalOpen(false)}
       />
     </>
   );

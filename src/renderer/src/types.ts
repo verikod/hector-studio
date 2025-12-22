@@ -274,6 +274,7 @@ export interface ServerConfig {
   isLocal?: boolean;      // True for workspace-based local server
   workspacePath?: string; // Absolute path to workspace directory (only for local)
   port?: number;          // Port for local server (auto-assigned)
+  envVars?: Record<string, string>; // Workspace-scoped environment variables
   auth?: {
     enabled: boolean;
     type: string;

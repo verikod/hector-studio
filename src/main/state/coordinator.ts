@@ -157,7 +157,7 @@ class AppStateCoordinator {
         mkdirSync(defaultPath, { recursive: true })
         
         console.log('[StateCoordinator] Creating default workspace:', defaultPath)
-        const workspace = serverManager.addWorkspace('Default', defaultPath)
+        const workspace = await serverManager.addWorkspace('Default', defaultPath)
         
         if (workspace) {
           console.log('[StateCoordinator] Starting workspace:', workspace.id)

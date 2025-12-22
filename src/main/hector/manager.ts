@@ -358,14 +358,25 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
     }
 
     const binaryPath = getHectorBinaryPath()
-    const { workspacePath, port, id } = workspace
+    const { workspacePath, id } = workspace
 
     // Ensure workspace directory exists
     if (!existsSync(workspacePath)) {
         mkdirSync(workspacePath, { recursive: true })
     }
 
-    console.log(`[hector] Starting workspace ${id} on port ${port}: ${workspacePath}`)
+    // Assign a fresh free port on startup to ensure availability
+    // This fixes issues where a stored port might be taken by another app
+    const freshPort = await serverManager.findFreePort()
+    console.log(`[hector] Assigned fresh port ${freshPort} for workspace ${id}`)
+    
+    // Update persisted config
+    serverManager.updateServer(id, {
+        port: freshPort,
+        url: `http://localhost:${freshPort}`
+    })
+
+    console.log(`[hector] Starting workspace ${id} on port ${freshPort}: ${workspacePath}`)
     setStatus('starting')
     activeWorkspaceId = id
     emitWorkspaceStatus(id, 'starting')
@@ -374,7 +385,7 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
 
     hectorProcess = spawn(binaryPath, [
         'serve',
-        '--port', String(port),
+        '--port', String(freshPort),
         '--studio',
         '--config', configPath
     ], {
@@ -422,7 +433,7 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
     // This is the authoritative source of truth for 'running' status.
     // Once healthy, we emit 'running' which maps to 'authenticated' in the renderer.
     // Local workspaces in the renderer wait for this IPC event rather than probing directly.
-    const serverUrl = `http://localhost:${port}`
+    const serverUrl = `http://localhost:${freshPort}`
     console.log(`[hector] Waiting for health check at ${serverUrl}/health...`)
 
     // Set as active server immediately to ensure persistence matches intent
@@ -563,6 +574,17 @@ export async function checkForUpdates(): Promise<{
     currentVersion: string | null
     latestVersion: string
 }> {
+    // If running in dev mode with custom binary, always say we are up to date
+    if (process.env.DEV_HECTOR_PATH) {
+        console.log('[hector] Running with DEV_HECTOR_PATH, skipping update check')
+        const latest = HECTOR_COMPATIBILITY.recommendedVersion
+        return {
+            hasUpdate: false,
+            currentVersion: latest, 
+            latestVersion: latest
+        }
+    }
+
     const current = await getInstalledVersion()
     const latest = HECTOR_COMPATIBILITY.recommendedVersion
 

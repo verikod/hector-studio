@@ -29,6 +29,13 @@ import {
   isOfflineValidationAllowed,
   updateLastValidated
 } from './license/store'
+import {
+  getGlobalEnvVars,
+  setGlobalEnvVars,
+  mergeEnvVars,
+  formatAsEnvFile
+} from './envVars/store'
+import { writeFileSync } from 'fs'
 
 export function registerIPCHandlers(): void {
   // Server Management
@@ -100,7 +107,7 @@ export function registerIPCHandlers(): void {
     mkdirSync(defaultPath, { recursive: true })
 
     console.log('[ipc] Creating default workspace:', defaultPath)
-    const workspace = serverManager.addWorkspace('Default', defaultPath)
+    const workspace = await serverManager.addWorkspace('Default', defaultPath)
 
     if (workspace) {
       console.log('[ipc] Starting default workspace:', workspace.id)
@@ -127,7 +134,7 @@ export function registerIPCHandlers(): void {
     }
 
     // 3. Add workspace
-    const workspace = serverManager.addWorkspace(name, path)
+    const workspace = await serverManager.addWorkspace(name, path)
 
     if (workspace) {
       console.log('[ipc] Starting workspace:', workspace.id)
@@ -254,4 +261,37 @@ export function registerIPCHandlers(): void {
   })
 
   ipcMain.handle('license:portal-url', () => getCheckoutUrl())
+
+  // Environment Variables Management
+  ipcMain.handle('env:get-global', () => getGlobalEnvVars())
+
+  ipcMain.handle('env:set-global', async (_, envVars: Record<string, string>) => {
+    setGlobalEnvVars(envVars)
+    return { success: true }
+  })
+
+  ipcMain.handle('env:get-workspace', async (_, id: string) => {
+    const server = serverManager.getServer(id)
+    return server?.envVars ?? {}
+  })
+
+  ipcMain.handle('env:set-workspace', async (_, { id, envVars }: { id: string; envVars: Record<string, string> }) => {
+    const server = serverManager.getServer(id)
+    if (!server || !server.workspacePath) {
+      throw new Error('Workspace not found or has no path')
+    }
+
+    // Update workspace config
+    serverManager.updateServer(id, { envVars })
+
+    // Merge with global vars and write to .env file
+    const merged = mergeEnvVars(envVars)
+    const envPath = join(server.workspacePath, '.env')
+    const content = formatAsEnvFile(merged)
+    
+    writeFileSync(envPath, content, 'utf-8')
+    console.log(`[ipc] Wrote .env file to ${envPath}`)
+
+    return { success: true, path: envPath }
+  })
 }

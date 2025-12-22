@@ -273,6 +273,9 @@ export function CreateWorkspaceModal({ open, onOpenChange }: CreateWorkspaceModa
                             {isCustomUrlSelected && (
                                 <p className="text-xs text-green-400 mt-1">✓ Custom repository selected</p>
                             )}
+                            <p className="text-[10px] text-gray-500 mt-1 ml-1">
+                                Supports direct links to subfolders (e.g. github.com/owner/repo/tree/main/path/to/skill)
+                            </p>
                         </div>
 
                         {/* Footer */}
