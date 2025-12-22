@@ -96,30 +96,26 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                     <span className="text-[10px] text-gray-500 font-mono">v0.1.5</span>
                 </div>
 
-                {/* Center: Server Selection */}
-                <div className="flex-1 flex justify-center px-4">
+                {/* Center: Server Selection + Workspace Quick Actions */}
+                <div className="flex-1 flex items-center justify-center gap-2 px-4">
                     <ServerSelector
                         onLoginRequest={onLoginRequest}
                         onLogoutRequest={onLogoutRequest}
                         onEnableWorkspaces={onEnableWorkspaces}
                     />
-                </div>
-
-                {/* Right: Workspace Actions + Deploy */}
-                <div className="flex items-center gap-3">
-                    {/* Workspace-only actions */}
+                    {/* Workspace-only quick actions */}
                     {activeServer?.config.isLocal && (
-                        <>
+                        <div className="flex items-center gap-1 ml-1">
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10"
+                                            className="h-7 w-7 text-gray-400 hover:text-white hover:bg-white/10"
                                             onClick={() => window.dispatchEvent(new CustomEvent('open-log-drawer'))}
                                         >
-                                            <Terminal size={16} />
+                                            <Terminal size={14} />
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>Show Logs</TooltipContent>
@@ -131,14 +127,14 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10"
+                                            className="h-7 w-7 text-gray-400 hover:text-white hover:bg-white/10"
                                             onClick={() => {
                                                 if (activeServer.config.workspacePath) {
                                                     (window as any).api.workspace.openFolder(activeServer.config.workspacePath);
                                                 }
                                             }}
                                         >
-                                            <FolderOpen size={16} />
+                                            <FolderOpen size={14} />
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>Open Folder</TooltipContent>
@@ -150,22 +146,23 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                                            className="h-7 w-7 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
                                             onClick={() => setShowEnvModal(true)}
                                         >
-                                            <Variable size={16} />
+                                            <Variable size={14} />
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>Environment Variables</TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
-                        </>
+                        </div>
                     )}
+                </div>
 
-                    {/* Studio actions */}
+                {/* Right: Deploy Actions */}
+                <div className="flex items-center gap-2">
                     {isStudioEnabled && (
                         <>
-                            <div className="h-5 w-px bg-white/10 mx-1" />
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -189,7 +186,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                 onClick={handleDeploy}
                                 disabled={!studioIsValidYaml || studioIsDeploying}
                                 className={cn(
-                                    "h-8 gap-1.5 font-medium transition-all text-xs ml-1",
+                                    "h-8 gap-1.5 font-medium transition-all text-xs",
                                     !studioIsValidYaml ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "bg-hector-green hover:bg-hector-green/80 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                                 )}
                             >
