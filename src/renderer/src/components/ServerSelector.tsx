@@ -171,10 +171,10 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
         <>
             <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-[240px] justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300">
+                    <Button variant="outline" className="min-w-[200px] max-w-[400px] justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300">
                         <div className="flex items-center gap-2">
                             <Server size={14} />
-                            <span className="truncate max-w-[120px]">
+                            <span className="truncate max-w-[280px]">
                                 {activeServer?.config.name || 'Select Server'}
                             </span>
                         </div>
@@ -190,7 +190,7 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                         </div>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[240px] bg-gray-900 border-gray-800 text-gray-300">
+                <DropdownMenuContent className="w-[320px] bg-gray-900 border-gray-800 text-gray-300">
                     <DropdownMenuLabel>Servers</DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-gray-800" />
                     <div className="max-h-[200px] overflow-y-auto">
