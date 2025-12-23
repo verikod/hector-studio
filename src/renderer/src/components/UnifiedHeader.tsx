@@ -99,7 +99,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
     return (
         <>
             <header className="flex-shrink-0 h-12 bg-black/60 border-b border-white/10 flex items-center px-4 justify-between backdrop-blur-md z-50">
-                {/* Left: Branding + Screen Modes */}
+                {/* Left: Branding */}
                 <div className="flex items-center gap-4">
                     {/* Logo */}
                     <div className="flex items-center gap-2 select-none">
@@ -107,46 +107,45 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                         <span className="font-bold tracking-wide text-sm text-white">Hector Studio</span>
                         <span className="text-[10px] text-gray-500 font-mono">v0.1.5</span>
                     </div>
-
-                    {/* Screen Mode Tabs */}
-                    {isStudioEnabled && (
-                        <>
-                            <div className="h-5 w-px bg-white/10" />
-                            <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10">
-                                <button
-                                    onClick={() => setStudioViewMode('design')}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
-                                        studioViewMode === 'design' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
-                                    )}
-                                >
-                                    <LayoutTemplate size={12} />
-                                    Design
-                                </button>
-                                <button
-                                    onClick={() => setStudioViewMode('split')}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
-                                        studioViewMode === 'split' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
-                                    )}
-                                >
-                                    <Split size={12} />
-                                    Split
-                                </button>
-                                <button
-                                    onClick={() => setStudioViewMode('chat')}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
-                                        studioViewMode === 'chat' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
-                                    )}
-                                >
-                                    <MessageSquare size={12} />
-                                    Chat
-                                </button>
-                            </div>
-                        </>
-                    )}
                 </div>
+
+                {/* Center: Screen Mode Tabs */}
+                {isStudioEnabled && (
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10">
+                            <button
+                                onClick={() => setStudioViewMode('design')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                                    studioViewMode === 'design' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
+                                )}
+                            >
+                                <LayoutTemplate size={12} />
+                                Design
+                            </button>
+                            <button
+                                onClick={() => setStudioViewMode('split')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                                    studioViewMode === 'split' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
+                                )}
+                            >
+                                <Split size={12} />
+                                Split
+                            </button>
+                            <button
+                                onClick={() => setStudioViewMode('chat')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                                    studioViewMode === 'chat' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
+                                )}
+                            >
+                                <MessageSquare size={12} />
+                                Chat
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Right: Workspace Selection + Actions + Deploy */}
                 <div className="flex items-center gap-3">
