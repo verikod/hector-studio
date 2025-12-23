@@ -358,7 +358,7 @@ export const StudioMode: React.FC = () => {
 
       {/* Status Bar */}
       {isStudioModeEnabled && (
-        <div className="h-8 bg-black/80 border-t border-white/10 flex items-center justify-between px-4 text-xs select-none">
+        <div className="h-8 bg-black/80 border-t border-white/10 flex items-center justify-between px-4 text-xs select-none relative">
           {/* Left: Validation Status */}
           <div className="flex items-center gap-4">
             {isValidYaml ? (
@@ -371,6 +371,14 @@ export const StudioMode: React.FC = () => {
                 <XCircle size={12} />
                 <span className="truncate max-w-[300px]">Invalid: {validationError}</span>
               </div>
+            )}
+          </div>
+
+          {/* Center: Screen Mode Indicator */}
+          <div className="absolute left-1/2 -translate-x-1/2 text-gray-500">
+            <span className="uppercase tracking-wider">{viewMode}</span>
+            {(viewMode === 'design' || viewMode === 'split') && designView && (
+              <span className="text-gray-600"> / {designView}</span>
             )}
           </div>
 
