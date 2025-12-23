@@ -20,8 +20,8 @@ import { mergeEnvVars, formatAsEnvFile } from '../envVars/store'
 
 // Hector compatibility - should match Studio release
 const HECTOR_COMPATIBILITY = {
-    minVersion: '0.11.1',
-    recommendedVersion: '0.11.1',
+    minVersion: '1.12.0',
+    recommendedVersion: '1.12.0',
     downloadBaseUrl: 'https://github.com/verikod/hector/releases/download'
 }
 
