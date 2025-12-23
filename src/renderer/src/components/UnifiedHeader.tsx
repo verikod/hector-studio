@@ -98,21 +98,21 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
 
     return (
         <>
-            <header className="flex-shrink-0 h-12 bg-black/60 border-b border-white/10 flex items-center px-4 justify-between backdrop-blur-md z-50">
+            <header className="flex-shrink-0 h-12 bg-black/60 border-b border-white/10 grid grid-cols-[1fr_auto_1fr] items-center px-4 backdrop-blur-md z-50 gap-4">
                 {/* Left: Branding */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 min-w-0">
                     {/* Logo */}
-                    <div className="flex items-center gap-2 select-none">
+                    <div className="flex items-center gap-2 select-none flex-shrink-0">
                         <img src={hectorIcon} alt="Hector" className="w-5 h-5 object-contain" />
-                        <span className="font-bold tracking-wide text-sm text-white">Hector Studio</span>
-                        <span className="text-[10px] text-gray-500 font-mono">v0.1.5</span>
+                        <span className="font-bold tracking-wide text-sm text-white hidden sm:inline">Hector Studio</span>
+                        <span className="text-[10px] text-gray-500 font-mono hidden sm:inline">v0.1.5</span>
                     </div>
                 </div>
 
                 {/* Center: Screen Mode Tabs */}
-                {isStudioEnabled && (
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                        <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10">
+                <div className="flex justify-center min-w-0">
+                    {isStudioEnabled && (
+                        <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10 flex-shrink-0">
                             <button
                                 onClick={() => setStudioViewMode('design')}
                                 className={cn(
@@ -121,7 +121,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                 )}
                             >
                                 <LayoutTemplate size={12} />
-                                Design
+                                <span className="hidden md:inline">Design</span>
                             </button>
                             <button
                                 onClick={() => setStudioViewMode('split')}
@@ -131,7 +131,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                 )}
                             >
                                 <Split size={12} />
-                                Split
+                                <span className="hidden md:inline">Split</span>
                             </button>
                             <button
                                 onClick={() => setStudioViewMode('chat')}
@@ -141,24 +141,26 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                 )}
                             >
                                 <MessageSquare size={12} />
-                                Chat
+                                <span className="hidden md:inline">Chat</span>
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 {/* Right: Workspace Selection + Actions + Deploy */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 justify-end min-w-0">
                     {/* Server/Workspace Selector */}
-                    <ServerSelector
-                        onLoginRequest={onLoginRequest}
-                        onLogoutRequest={onLogoutRequest}
-                        onEnableWorkspaces={onEnableWorkspaces}
-                    />
+                    <div className="flex-shrink min-w-0">
+                        <ServerSelector
+                            onLoginRequest={onLoginRequest}
+                            onLogoutRequest={onLogoutRequest}
+                            onEnableWorkspaces={onEnableWorkspaces}
+                        />
+                    </div>
 
                     {/* Workspace-only quick actions */}
                     {activeServer?.config.isLocal && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 flex-shrink-0">
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -214,14 +216,14 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                     {/* Deploy Actions */}
                     {isStudioEnabled && (
                         <>
-                            <div className="h-5 w-px bg-white/10" />
+                            <div className="h-5 w-px bg-white/10 flex-shrink-0" />
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 text-gray-400 hover:text-white"
+                                            className="h-8 w-8 text-gray-400 hover:text-white flex-shrink-0"
                                             onClick={handleDownload}
                                             disabled={!studioYamlContent}
                                         >
@@ -238,12 +240,12 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                 onClick={handleDeploy}
                                 disabled={!studioIsValidYaml || studioIsDeploying}
                                 className={cn(
-                                    "h-8 gap-1.5 font-medium transition-all text-xs",
+                                    "h-8 gap-1.5 font-medium transition-all text-xs flex-shrink-0",
                                     !studioIsValidYaml ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "bg-hector-green hover:bg-hector-green/80 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                                 )}
                             >
                                 <Rocket size={14} className={cn(studioIsDeploying && "animate-pulse")} />
-                                {studioIsDeploying ? 'Deploying...' : 'Deploy'}
+                                <span className="hidden sm:inline">{studioIsDeploying ? 'Deploying...' : 'Deploy'}</span>
                             </Button>
                         </>
                     )}
