@@ -13,7 +13,7 @@
 const LEMONSQUEEZY_API_URL = 'https://api.lemonsqueezy.com/v1'
 
 // Checkout URL for getting a license
-export const CHECKOUT_URL = 'https://hector-studio.lemonsqueezy.com/checkout/buy/856e3874-0c11-4a1d-9c23-bc72a458b3a3'
+export const CHECKOUT_URL = 'https://hector-studio.lemonsqueezy.com/checkout/buy/3156a964-32ee-41f1-936e-0ed76a56e671'
 
 export interface License {
     key: string

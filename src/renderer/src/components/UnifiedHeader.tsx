@@ -105,7 +105,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                     <div className="flex items-center gap-2 select-none">
                         <img src={hectorIcon} alt="Hector" className="w-5 h-5 object-contain" />
                         <span className="font-bold tracking-wide text-sm text-white hidden sm:inline">Hector Studio</span>
-                        <span className="text-[10px] text-gray-500 font-mono hidden sm:inline">v0.1.5</span>
+                        <span className="text-[10px] text-gray-500 font-mono hidden sm:inline">v0.3.1</span>
                     </div>
                 </div>
 
