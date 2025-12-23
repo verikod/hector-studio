@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 import { WorkspaceEnvModal } from './WorkspaceEnvModal';
-import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen, Variable } from 'lucide-react';
+import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen } from 'lucide-react';
 import { useServersStore } from '../store/serversStore';
 import { useLicenseStore } from '../store/licenseStore';
 import { useStore } from '../store/useStore';
@@ -171,7 +171,7 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
         <>
             <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="min-w-[200px] max-w-[400px] justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300">
+                    <Button variant="outline" className="min-w-[280px] max-w-[500px] justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300">
                         <div className="flex items-center gap-2">
                             <Server size={14} />
                             <span className="truncate max-w-[280px]">
@@ -256,23 +256,6 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
                                         >
                                             <Trash2 size={12} />
                                         </Button>
-                                        {/* Env vars button for workspaces */}
-                                        {server.config.isLocal && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 hover:bg-blue-500/20"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setEnvModalWorkspace(server.config);
-                                                    setShowEnvModal(true);
-                                                    setIsOpen(false);
-                                                }}
-                                                title="Environment Variables"
-                                            >
-                                                <Variable size={12} className="text-blue-400" />
-                                            </Button>
-                                        )}
                                     </div>
                                 </DropdownMenuItem>
                             ))

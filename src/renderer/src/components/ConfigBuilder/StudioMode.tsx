@@ -328,7 +328,7 @@ export const StudioMode: React.FC = () => {
         {/* Resize Handle */}
         {viewMode === 'split' && isStudioModeEnabled && (
           <div
-            className="w-1 cursor-col-resize hover:bg-hector-green/50 hover:shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-colors active:bg-hector-green z-50 flex items-center justify-center group relative"
+            className="w-1 cursor-col-resize hover:bg-hector-green/50 hover:shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-colors active:bg-hector-green z-10 flex items-center justify-center group relative"
             onMouseDown={startResizing}
           >
             <div className="h-8 w-1 bg-white/10 rounded-full group-hover:bg-white/40 transition-colors" />
