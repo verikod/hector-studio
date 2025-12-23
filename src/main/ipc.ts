@@ -284,9 +284,10 @@ export function registerIPCHandlers(): void {
     // Update workspace config
     serverManager.updateServer(id, { envVars })
 
-    // Merge with global vars and write to .env file
+    // Merge with global vars and write to .env file in .hector directory
+    // This location is watched by Hector for hot-reload
     const merged = mergeEnvVars(envVars)
-    const envPath = join(server.workspacePath, '.env')
+    const envPath = join(server.workspacePath, '.hector', '.env')
     const content = formatAsEnvFile(merged)
     
     writeFileSync(envPath, content, 'utf-8')

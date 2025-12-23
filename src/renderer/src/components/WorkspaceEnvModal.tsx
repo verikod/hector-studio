@@ -83,7 +83,7 @@ export const WorkspaceEnvModal: React.FC<WorkspaceEnvModalProps> = ({
                 )}
 
                 <p className="text-xs text-gray-500">
-                    Changes are written to <code className="text-gray-400">{workspace.workspacePath}/.env</code>.
+                    Changes are written to <code className="text-gray-400">{workspace.workspacePath}/.hector/.env</code>.
                     Hector will automatically reload when this file changes.
                 </p>
             </div>

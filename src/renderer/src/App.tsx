@@ -211,7 +211,7 @@ function App() {
       };
       checkStudioMode();
     }
-  }, [activeServer?.config.id, activeServer?.status, loadAgents, createSession]);
+  }, [activeServer?.config.id, activeServer?.status, activeServer?.config.url, loadAgents, createSession]);
 
   const handleLoginRequest = (serverId: string) => {
     setLoginServerId(serverId);

@@ -11,11 +11,12 @@
 import { app, BrowserWindow, net } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import { join } from 'path'
-import { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync } from 'fs'
+import { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync, writeFileSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { get as httpsGet } from 'https'
 import { pipeline } from 'stream/promises'
 import { serverManager, ServerConfig } from '../servers/manager'
+import { mergeEnvVars, formatAsEnvFile } from '../envVars/store'
 
 // Hector compatibility - should match Studio release
 const HECTOR_COMPATIBILITY = {
@@ -380,6 +381,23 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
     setStatus('starting')
     activeWorkspaceId = id
     emitWorkspaceStatus(id, 'starting')
+
+    // Ensure .hector directory exists
+    const hectorDir = join(workspacePath, '.hector')
+    if (!existsSync(hectorDir)) {
+        mkdirSync(hectorDir, { recursive: true })
+    }
+
+    // Write .env file BEFORE starting Hector so env vars are available for config validation
+    // This fixes the chicken-and-egg problem where Hector needs env vars at startup
+    const envVars = workspace.envVars || {}
+    const merged = mergeEnvVars(envVars)
+    if (Object.keys(merged).length > 0) {
+        const envPath = join(hectorDir, '.env')
+        const content = formatAsEnvFile(merged)
+        writeFileSync(envPath, content, 'utf-8')
+        console.log(`[hector] Wrote .env file to ${envPath}`)
+    }
 
     const configPath = join(workspacePath, '.hector', 'config.yaml')
 
