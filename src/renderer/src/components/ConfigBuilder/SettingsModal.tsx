@@ -1,8 +1,9 @@
-import React from "react";
-import { X, Monitor, RefreshCw, FolderOpen, Key, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { X, RefreshCw, FolderOpen, Key, Trash2, Zap, Palette } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import { useServersStore } from "../../store/serversStore";
 import { useLicenseStore } from "../../store/licenseStore";
+import { cn } from "../../lib/utils";
 
 import { useWorkspaceControl } from "../../lib/hooks/useWorkspaceControl";
 import { useLicenseControl } from "../../lib/hooks/useLicenseControl";
@@ -12,10 +13,12 @@ interface SettingsModalProps {
   onClose: () => void;
   editorTheme: 'vs-dark' | 'vs-light' | 'hc-black';
   onThemeChange: (theme: 'vs-dark' | 'vs-light' | 'hc-black') => void;
-  workspacesEnabled?: boolean; // TODO: remove after migration complete
+  workspacesEnabled?: boolean;
   onLicenseDeactivated?: () => void;
-  isLicensed?: boolean; // TODO: remove after migration complete
+  isLicensed?: boolean;
 }
+
+type SettingsTab = 'general' | 'license' | 'workspaces';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -24,25 +27,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onThemeChange,
   onLicenseDeactivated,
 }) => {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+
   const streamingEnabled = useStore((state) => state.streamingEnabled);
   const setStreamingEnabled = useStore((state) => state.setStreamingEnabled);
 
   // Centralized state from stores
   const workspacesEnabled = useServersStore((s) => s.workspacesEnabled);
 
-  // Select individual values to avoid creating new objects (causes infinite loop)
+  // Select individual values to avoid creating new objects
   const licenseIsLicensed = useLicenseStore((s) => s.isLicensed);
   const licenseEmail = useLicenseStore((s) => s.email);
   const licenseKey = useLicenseStore((s) => s.key);
 
   const { enableAndSelect, disableWorkspaces, isLoading: controlLoading } = useWorkspaceControl();
-
   const { deactivate, isLoading: licenseLoading } = useLicenseControl();
 
   const handleDeactivate = async () => {
     try {
       await deactivate();
-      // License state updated via IPC event in useLicenseInit
       onLicenseDeactivated?.();
     } catch (e) {
       // Error handled in hook
@@ -50,6 +53,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'general', label: 'General', icon: <Zap size={16} /> },
+    { id: 'license', label: 'License', icon: <Key size={16} /> },
+    { id: 'workspaces', label: 'Workspaces', icon: <FolderOpen size={16} /> },
+  ];
 
   return (
     <>
@@ -62,7 +71,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       {/* Modal */}
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
         <div
-          className="bg-gradient-to-br from-hector-darker to-black border border-white/20 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-in zoom-in-95 duration-200"
+          className="bg-gradient-to-br from-hector-darker to-black border border-white/20 rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -97,164 +106,200 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-6 space-y-6">
-
-
-            {/* Streaming */}
-            <div>
-              <label className="flex items-center justify-between cursor-pointer group">
-                <div>
-                  <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">
-                    Streaming Responses
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    Enable real-time message streaming
-                  </div>
-                </div>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={streamingEnabled}
-                    onChange={(e) => setStreamingEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all"></div>
-                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-                </div>
-              </label>
-            </div>
-            {/* Editor Theme */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                <Monitor size={16} className="text-hector-green" />
-                Editor Theme
-              </label>
-              <select
-                value={editorTheme}
-                onChange={(e) => onThemeChange(e.target.value as any)}
-                className="w-full px-4 py-2 bg-black/50 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-hector-green focus:border-transparent appearance-none cursor-pointer"
-              >
-                <option value="hc-black">High Contrast (Default)</option>
-                <option value="vs-dark">Dark Visual Studio</option>
-                <option value="vs-light">Light Visual Studio</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Color scheme for the YAML editor
-              </p>
-            </div>
-
-            {/* Updates */}
-            <div className="pt-4 border-t border-white/10">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Application Updates
-              </label>
+          {/* Tabs */}
+          <div className="flex border-b border-white/10">
+            {tabs.map((tab) => (
               <button
-                onClick={() => window.api.app.checkUpdate()}
-                className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center gap-2"
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
+                  activeTab === tab.id
+                    ? "text-white border-b-2 border-hector-green bg-white/5"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                )}
               >
-                <RefreshCw size={14} />
-                Check for Updates
+                {tab.icon}
+                {tab.label}
               </button>
-            </div>
+            ))}
+          </div>
 
-            {/* License Status */}
-            <div className="pt-4 border-t border-white/10">
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
-                <Key size={16} className="text-hector-green" />
-                License
-              </div>
-              {licenseIsLicensed ? (
-                <div className="space-y-3">
-                  <div className="bg-hector-green/10 border border-hector-green/30 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-hector-green text-sm font-medium">
-                      ✓ Studio Mode Active
-                    </div>
-                    {licenseEmail && (
-                      <div className="text-xs text-gray-400 mt-1">{licenseEmail}</div>
-                    )}
-                    {licenseKey && (
-                      <div className="mt-2 pt-2 border-t border-hector-green/20">
-                        <div className="text-xs text-gray-500 mb-1">License Key (save this!):</div>
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs text-gray-300 bg-black/30 px-2 py-1 rounded font-mono truncate flex-1">
-                            {licenseKey}
-                          </code>
-                          <button
-                            onClick={() => navigator.clipboard.writeText(licenseKey!)}
-                            className="text-xs text-gray-400 hover:text-white px-2 py-1 bg-white/5 hover:bg-white/10 rounded transition-colors"
-                          >
-                            Copy
-                          </button>
-                        </div>
+          {/* Content */}
+          <div className="p-6 min-h-[280px]">
+            {/* General Tab */}
+            {activeTab === 'general' && (
+              <div className="space-y-6">
+                {/* Streaming */}
+                <div>
+                  <label className="flex items-center justify-between cursor-pointer group">
+                    <div>
+                      <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
+                        <Zap size={16} className="text-yellow-400" />
+                        Streaming Responses
                       </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={handleDeactivate}
-                    disabled={licenseLoading}
-                    className="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors flex items-center justify-center gap-2"
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Enable real-time message streaming
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={streamingEnabled}
+                        onChange={(e) => setStreamingEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all"></div>
+                      <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Editor Theme */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                    <Palette size={16} className="text-purple-400" />
+                    Editor Theme
+                  </label>
+                  <select
+                    value={editorTheme}
+                    onChange={(e) => onThemeChange(e.target.value as any)}
+                    className="w-full px-4 py-2 bg-black/50 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-hector-green focus:border-transparent appearance-none cursor-pointer"
                   >
-                    <Trash2 size={14} />
-                    {licenseLoading ? 'Deactivating...' : 'Deactivate License'}
+                    <option value="hc-black">High Contrast (Default)</option>
+                    <option value="vs-dark">Dark Visual Studio</option>
+                    <option value="vs-light">Light Visual Studio</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Color scheme for the YAML editor
+                  </p>
+                </div>
+
+                {/* Updates */}
+                <div className="pt-4 border-t border-white/10">
+                  <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                    <RefreshCw size={16} className="text-blue-400" />
+                    Application Updates
+                  </label>
+                  <button
+                    onClick={() => window.api.app.checkUpdate()}
+                    className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={14} />
+                    Check for Updates
                   </button>
                 </div>
-              ) : (
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-                  <div className="text-yellow-400 text-sm font-medium">
-                    Chat Mode Only
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Activate a license to unlock Studio Mode features
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Workspaces */}
-            <div className="pt-4 border-t border-white/10">
-              <label className={`flex items-center justify-between cursor-pointer group ${!licenseIsLicensed ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <div>
-                  <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
-                    <FolderOpen size={16} className="text-hector-green" />
-                    Local Workspaces
-                    {!licenseIsLicensed && (
-                      <span className="text-xs text-yellow-500 ml-2">(License required)</span>
-                    )}
+            {/* License Tab */}
+            {activeTab === 'license' && (
+              <div className="space-y-4">
+                {licenseIsLicensed ? (
+                  <>
+                    <div className="bg-hector-green/10 border border-hector-green/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-hector-green text-sm font-medium">
+                        ✓ Studio Mode Active
+                      </div>
+                      {licenseEmail && (
+                        <div className="text-xs text-gray-400 mt-1">{licenseEmail}</div>
+                      )}
+                      {licenseKey && (
+                        <div className="mt-3 pt-3 border-t border-hector-green/20">
+                          <div className="text-xs text-gray-500 mb-1">License Key (save this!):</div>
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs text-gray-300 bg-black/30 px-2 py-1 rounded font-mono truncate flex-1">
+                              {licenseKey}
+                            </code>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(licenseKey!)}
+                              className="text-xs text-gray-400 hover:text-white px-2 py-1 bg-white/5 hover:bg-white/10 rounded transition-colors"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleDeactivate}
+                      disabled={licenseLoading}
+                      className="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Trash2 size={14} />
+                      {licenseLoading ? 'Deactivating...' : 'Deactivate License'}
+                    </button>
+                  </>
+                ) : (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                    <div className="text-yellow-400 text-sm font-medium">
+                      Chat Mode Only
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Activate a license to unlock Studio Mode features including the visual config editor, canvas view, and local workspaces.
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    Run hector locally with managed workspaces
+                )}
+              </div>
+            )}
+
+            {/* Workspaces Tab */}
+            {activeTab === 'workspaces' && (
+              <div className="space-y-4">
+                <label className={cn(
+                  "flex items-center justify-between cursor-pointer group p-4 rounded-lg border transition-colors",
+                  !licenseIsLicensed
+                    ? "opacity-50 cursor-not-allowed border-white/10 bg-white/5"
+                    : workspacesEnabled
+                      ? "border-hector-green/30 bg-hector-green/5"
+                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                )}>
+                  <div>
+                    <div className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors flex items-center gap-2">
+                      <FolderOpen size={16} className="text-hector-green" />
+                      Local Workspaces
+                      {!licenseIsLicensed && (
+                        <span className="text-xs text-yellow-500 ml-2">(License required)</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Run Hector locally with managed workspace directories
+                    </div>
                   </div>
-                </div>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={workspacesEnabled}
-                    disabled={controlLoading || !licenseIsLicensed}
-                    onChange={async (e) => {
-                      const newValue = e.target.checked;
-                      try {
-                        if (newValue) {
-                          // Enable workspaces using centralized logic
-                          await enableAndSelect();
-                        } else {
-                          // Disable workspaces - coordinator handles everything:
-                          // stops workspace, sets flag, broadcasts event
-                          // useStateInit will clear active server selection
-                          await disableWorkspaces();
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={workspacesEnabled}
+                      disabled={controlLoading || !licenseIsLicensed}
+                      onChange={async (e) => {
+                        const newValue = e.target.checked;
+                        try {
+                          if (newValue) {
+                            await enableAndSelect();
+                          } else {
+                            await disableWorkspaces();
+                          }
+                        } catch (error) {
+                          console.error('Failed to toggle workspaces:', error);
                         }
-                        // State updated via IPC events
-                      } catch (error) {
-                        console.error('Failed to toggle workspaces:', error);
-                      }
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className={`w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all ${controlLoading ? 'opacity-50' : ''}`}></div>
-                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-                </div>
-              </label>
-            </div>
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className={cn(
+                      "w-11 h-6 bg-black/50 border border-white/20 rounded-full peer-checked:bg-hector-green peer-checked:border-hector-green transition-all",
+                      controlLoading && "opacity-50"
+                    )}></div>
+                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+                  </div>
+                </label>
+
+                {workspacesEnabled && (
+                  <div className="text-xs text-gray-500 p-3 bg-black/20 rounded-lg">
+                    <p>When enabled, you can create and manage local workspace directories. Each workspace runs its own Hector instance with isolated configuration.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Footer */}
