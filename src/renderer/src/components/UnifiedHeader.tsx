@@ -45,7 +45,8 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
         setStudioIsDeploying(true);
         try {
             await api.saveConfig(studioYamlContent);
-            useStore.getState().setSuccessMessage('Configuration deployed successfully! Agents are reloading...');
+            // Don't show success yet - wait for reload verification
+            // useStore.getState().setSuccessMessage('Configuration deployed successfully! Agents are reloading...');
 
             const reloadAgentsWithRetry = async (maxRetries = 5, initialDelayMs = 500) => {
                 const { reloadAgents } = useStore.getState();
@@ -62,6 +63,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                         const agents = useStore.getState().availableAgents;
                         if (agents.length > 0) {
                             console.log(`✅ Agents reloaded after deploy (attempt ${attempt + 1})`);
+                            useStore.getState().setSuccessMessage('Configuration deployed and agents reloaded successfully!');
                             return;
                         }
                         console.log(`Agents list empty, retrying... (attempt ${attempt + 1})`);
@@ -70,6 +72,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                     }
                 }
                 console.warn('Finished retries for agent reload - agents may still be initializing');
+                useStore.getState().setError('Configuration saved, but agents failed to reload within timeout.');
             };
 
             await reloadAgentsWithRetry();
