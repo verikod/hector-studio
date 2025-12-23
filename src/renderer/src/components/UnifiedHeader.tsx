@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Rocket, DownloadCloud, Terminal, FolderOpen, Variable } from 'lucide-react';
+import { Rocket, DownloadCloud, Terminal, FolderOpen, Variable, LayoutTemplate, Split, MessageSquare } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useServersStore } from '../store/serversStore';
 
@@ -28,6 +28,8 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
     const [showEnvModal, setShowEnvModal] = useState(false);
 
     // Studio State
+    const studioViewMode = useStore((s) => s.studioViewMode);
+    const setStudioViewMode = useStore((s) => s.setStudioViewMode);
     const studioIsValidYaml = useStore((s) => s.studioIsValidYaml);
     const studioYamlContent = useStore((s) => s.studioYamlContent);
     const studioIsDeploying = useStore((s) => s.studioIsDeploying);
@@ -45,7 +47,6 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
             await api.saveConfig(studioYamlContent);
             useStore.getState().setSuccessMessage('Configuration deployed successfully! Agents are reloading...');
 
-            // Poll for agents with retry logic
             const reloadAgentsWithRetry = async (maxRetries = 5, delayMs = 500) => {
                 for (let attempt = 0; attempt < maxRetries; attempt++) {
                     try {
@@ -65,7 +66,6 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
             };
 
             await reloadAgentsWithRetry();
-
         } catch (error) {
             useStore.getState().setError(`Deploy error: ${(error as Error).message}`);
         } finally {
@@ -89,23 +89,67 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
     return (
         <>
             <header className="flex-shrink-0 h-12 bg-black/60 border-b border-white/10 flex items-center px-4 justify-between backdrop-blur-md z-50">
-                {/* Left: Branding */}
-                <div className="flex items-center gap-2 select-none">
-                    <img src={hectorIcon} alt="Hector" className="w-5 h-5 object-contain" />
-                    <span className="font-bold tracking-wide text-sm text-white">Hector Studio</span>
-                    <span className="text-[10px] text-gray-500 font-mono">v0.1.5</span>
+                {/* Left: Branding + Screen Modes */}
+                <div className="flex items-center gap-4">
+                    {/* Logo */}
+                    <div className="flex items-center gap-2 select-none">
+                        <img src={hectorIcon} alt="Hector" className="w-5 h-5 object-contain" />
+                        <span className="font-bold tracking-wide text-sm text-white">Hector Studio</span>
+                        <span className="text-[10px] text-gray-500 font-mono">v0.1.5</span>
+                    </div>
+
+                    {/* Screen Mode Tabs */}
+                    {isStudioEnabled && (
+                        <>
+                            <div className="h-5 w-px bg-white/10" />
+                            <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10">
+                                <button
+                                    onClick={() => setStudioViewMode('design')}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                                        studioViewMode === 'design' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
+                                    )}
+                                >
+                                    <LayoutTemplate size={12} />
+                                    Design
+                                </button>
+                                <button
+                                    onClick={() => setStudioViewMode('split')}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                                        studioViewMode === 'split' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
+                                    )}
+                                >
+                                    <Split size={12} />
+                                    Split
+                                </button>
+                                <button
+                                    onClick={() => setStudioViewMode('chat')}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                                        studioViewMode === 'chat' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
+                                    )}
+                                >
+                                    <MessageSquare size={12} />
+                                    Chat
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
 
-                {/* Center: Server Selection + Workspace Quick Actions */}
-                <div className="flex-1 flex items-center justify-center gap-2 px-4">
+                {/* Right: Workspace Selection + Actions + Deploy */}
+                <div className="flex items-center gap-3">
+                    {/* Server/Workspace Selector */}
                     <ServerSelector
                         onLoginRequest={onLoginRequest}
                         onLogoutRequest={onLogoutRequest}
                         onEnableWorkspaces={onEnableWorkspaces}
                     />
+
                     {/* Workspace-only quick actions */}
                     {activeServer?.config.isLocal && (
-                        <div className="flex items-center gap-1 ml-1">
+                        <div className="flex items-center gap-1">
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -157,12 +201,11 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                             </TooltipProvider>
                         </div>
                     )}
-                </div>
 
-                {/* Right: Deploy Actions */}
-                <div className="flex items-center gap-2">
+                    {/* Deploy Actions */}
                     {isStudioEnabled && (
                         <>
+                            <div className="h-5 w-px bg-white/10" />
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>

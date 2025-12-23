@@ -360,7 +360,7 @@ export const StudioMode: React.FC = () => {
       {isStudioModeEnabled && (
         <div className="h-8 bg-black/80 border-t border-white/10 flex items-center justify-between px-4 text-xs select-none">
           {/* Left: Validation Status */}
-          <div className="flex items-center gap-4 min-w-[200px]">
+          <div className="flex items-center gap-4">
             {isValidYaml ? (
               <div className="flex items-center gap-1.5 text-green-400">
                 <CheckCircle size={12} />
@@ -369,54 +369,19 @@ export const StudioMode: React.FC = () => {
             ) : (
               <div className="flex items-center gap-1.5 text-red-400" title={validationError}>
                 <XCircle size={12} />
-                <span className="truncate max-w-[200px]">Invalid: {validationError}</span>
+                <span className="truncate max-w-[300px]">Invalid: {validationError}</span>
               </div>
             )}
           </div>
 
-          {/* Center: Screen Mode Tabs */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
-            <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10">
-              <button
-                onClick={() => useStore.getState().setStudioViewMode('design')}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded transition-all",
-                  viewMode === 'design' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
-                )}
-              >
-                Design
-              </button>
-              <button
-                onClick={() => useStore.getState().setStudioViewMode('split')}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded transition-all",
-                  viewMode === 'split' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
-                )}
-              >
-                Split
-              </button>
-              <button
-                onClick={() => useStore.getState().setStudioViewMode('chat')}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded transition-all",
-                  viewMode === 'chat' ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
-                )}
-              >
-                Chat
-              </button>
-            </div>
-          </div>
-
           {/* Right: Settings */}
-          <div className="flex items-center justify-end">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="flex items-center gap-1.5 px-2 py-1 text-gray-500 hover:text-white hover:bg-white/10 rounded transition-colors"
-            >
-              <Settings size={14} />
-              <span className="text-xs">Settings</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-1.5 px-2 py-1 text-gray-500 hover:text-white hover:bg-white/10 rounded transition-colors"
+          >
+            <Settings size={14} />
+            <span>Settings</span>
+          </button>
         </div>
       )}
 
