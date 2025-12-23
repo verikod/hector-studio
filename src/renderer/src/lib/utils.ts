@@ -19,3 +19,9 @@ export function formatTime(dateString: string): string {
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
 }
+
+/**
+ * Wait for a specified number of milliseconds.
+ * Promisified setTimeout for cleaner async/await usage.
+ */
+export const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

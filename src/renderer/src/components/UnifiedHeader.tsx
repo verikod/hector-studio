@@ -5,7 +5,7 @@ import { useServersStore } from '../store/serversStore';
 
 import { ServerSelector } from './ServerSelector';
 import { WorkspaceEnvModal } from './WorkspaceEnvModal';
-import { cn } from '../lib/utils';
+import { cn, wait } from '../lib/utils';
 import { Button } from './ui/button';
 import {
     Tooltip,
@@ -47,11 +47,18 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
             await api.saveConfig(studioYamlContent);
             useStore.getState().setSuccessMessage('Configuration deployed successfully! Agents are reloading...');
 
-            const reloadAgentsWithRetry = async (maxRetries = 5, delayMs = 500) => {
+            const reloadAgentsWithRetry = async (maxRetries = 5, initialDelayMs = 500) => {
+                const { reloadAgents } = useStore.getState();
+
                 for (let attempt = 0; attempt < maxRetries; attempt++) {
                     try {
-                        await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(1.5, attempt)));
-                        await useStore.getState().reloadAgents();
+                        // Exponential backoff
+                        const delay = initialDelayMs * Math.pow(1.5, attempt);
+                        await wait(delay);
+
+                        await reloadAgents();
+
+                        // Check freshness directly from store
                         const agents = useStore.getState().availableAgents;
                         if (agents.length > 0) {
                             console.log(`✅ Agents reloaded after deploy (attempt ${attempt + 1})`);
@@ -62,7 +69,7 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                         console.warn(`Failed to reload agents (attempt ${attempt + 1}/${maxRetries}):`, e);
                     }
                 }
-                console.warn('Finished retries for agent reload');
+                console.warn('Finished retries for agent reload - agents may still be initializing');
             };
 
             await reloadAgentsWithRetry();
