@@ -171,7 +171,7 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
         <>
             <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="min-w-[280px] max-w-[500px] justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300">
+                    <Button variant="outline" className="min-w-0 w-40 sm:w-72 justify-between bg-black/40 border-white/10 hover:bg-white/5 hover:text-white text-gray-300 px-3">
                         <div className="flex items-center gap-2">
                             <Server size={14} />
                             <span className="truncate max-w-[280px]">

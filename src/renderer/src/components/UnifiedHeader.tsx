@@ -98,21 +98,21 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
 
     return (
         <>
-            <header className="flex-shrink-0 h-12 bg-black/60 border-b border-white/10 grid grid-cols-[1fr_auto_1fr] items-center px-4 backdrop-blur-md z-50 gap-4">
+            <header className="flex-shrink-0 h-12 bg-black/60 border-b border-white/10 flex items-center px-4 backdrop-blur-md z-50 gap-4">
                 {/* Left: Branding */}
-                <div className="flex items-center gap-4 min-w-0">
+                <div className="flex items-center gap-4 flex-shrink-0">
                     {/* Logo */}
-                    <div className="flex items-center gap-2 select-none flex-shrink-0">
+                    <div className="flex items-center gap-2 select-none">
                         <img src={hectorIcon} alt="Hector" className="w-5 h-5 object-contain" />
                         <span className="font-bold tracking-wide text-sm text-white hidden sm:inline">Hector Studio</span>
                         <span className="text-[10px] text-gray-500 font-mono hidden sm:inline">v0.1.5</span>
                     </div>
                 </div>
 
-                {/* Center: Screen Mode Tabs */}
-                <div className="flex justify-center min-w-0">
+                {/* Center: Screen Mode Tabs (Responsive Flex) */}
+                <div className="flex-1 flex justify-center min-w-0">
                     {isStudioEnabled && (
-                        <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10 flex-shrink-0">
+                        <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10 flex-shrink-0 mx-auto">
                             <button
                                 onClick={() => setStudioViewMode('design')}
                                 className={cn(
