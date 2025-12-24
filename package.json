@@ -1,6 +1,6 @@
 {
   "name": "hector-studio",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "productName": "Hector Studio",
   "description": "Hector Studio Desktop Application",
   "main": "./out/main/index.js",
