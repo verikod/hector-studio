@@ -53,6 +53,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     trigger: data?.trigger || { type: '', cron: '', timezone: 'UTC', input: '', enabled: true },
   });
 
+  const [customTool, setCustomTool] = React.useState('');
+
+  const handleAddCustomTool = () => {
+    if (!customTool.trim()) return;
+
+    // Check if valid format (alphanumeric + underscore/dash usually)
+    const toolName = customTool.trim();
+
+    // Don't add if already exists
+    if (!localData.tools.includes(toolName)) {
+      handleChange('tools', [...localData.tools, toolName]);
+    }
+
+    setCustomTool('');
+  };
+
   React.useEffect(() => {
     setLocalData({
       label: data?.label || '',
@@ -194,6 +210,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <div>
                 <label className="block text-sm font-medium mb-1.5">Tools</label>
                 <div className="space-y-1 max-h-32 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+                  {/* Show configured tool options */}
                   {toolOptions.map((tool) => (
                     <label key={tool} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
                       <input
@@ -206,7 +223,58 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       <span>{tool}</span>
                     </label>
                   ))}
+
+                  {/* Show custom added tools that aren't in options */}
+                  {localData.tools
+                    .filter(t => !toolOptions.includes(t))
+                    .map((tool) => (
+                      <label key={tool} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded group">
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          onChange={() => handleMultiSelect('tools', tool, false)}
+                          disabled={readonly}
+                          className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                        />
+                        <span className="flex-1 truncate text-gray-300" title={tool}>{tool}</span>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleMultiSelect('tools', tool, false);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-white/10 rounded text-gray-500 hover:text-red-400 transition-all"
+                        >
+                          <X size={12} />
+                        </button>
+                      </label>
+                    ))}
                 </div>
+
+                {/* Custom tool input */}
+                {!readonly && (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={customTool}
+                      onChange={(e) => setCustomTool(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomTool();
+                        }
+                      }}
+                      className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-xs focus:outline-none focus:border-hector-green placeholder-gray-600"
+                      placeholder="Add custom tool..."
+                    />
+                    <button
+                      onClick={handleAddCustomTool}
+                      disabled={!customTool.trim()}
+                      className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -329,6 +397,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 Tools execute in order without LLM reasoning. Output of each tool feeds into the next.
               </p>
               <div className="space-y-1 max-h-32 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+                {/* Show configured tool options */}
                 {toolOptions.map((tool) => (
                   <label key={tool} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
                     <input
@@ -341,7 +410,58 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <span>{tool}</span>
                   </label>
                 ))}
+
+                {/* Show custom added tools that aren't in options */}
+                {localData.tools
+                  .filter(t => !toolOptions.includes(t))
+                  .map((tool) => (
+                    <label key={tool} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded group">
+                      <input
+                        type="checkbox"
+                        checked={true}
+                        onChange={() => handleMultiSelect('tools', tool, false)}
+                        disabled={readonly}
+                        className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                      />
+                      <span className="flex-1 truncate text-gray-300" title={tool}>{tool}</span>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleMultiSelect('tools', tool, false);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-white/10 rounded text-gray-500 hover:text-red-400 transition-all"
+                      >
+                        <X size={12} />
+                      </button>
+                    </label>
+                  ))}
               </div>
+
+              {/* Custom tool input */}
+              {!readonly && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={customTool}
+                    onChange={(e) => setCustomTool(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomTool();
+                      }
+                    }}
+                    className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-xs focus:outline-none focus:border-hector-green placeholder-gray-600"
+                    placeholder="Add custom tool..."
+                  />
+                  <button
+                    onClick={handleAddCustomTool}
+                    disabled={!customTool.trim()}
+                    className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
             </div>
           )
         }
