@@ -183,6 +183,16 @@ export interface AgentConfig {
   timeout?: string;
   // Workflow
   max_iterations?: number;
+  // Trigger
+  trigger?: TriggerConfig;
+}
+
+export interface TriggerConfig {
+  type?: string;
+  cron?: string;
+  timezone?: string;
+  input?: string;
+  enabled?: boolean;
 }
 
 /**

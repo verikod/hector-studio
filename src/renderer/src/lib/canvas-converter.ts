@@ -196,6 +196,7 @@ export const yamlToGraph = (yamlContent: string): GraphData => {
                 documentStores: subAgent.document_stores,
                 isRemote: subAgent.type === 'remote',
                 url: subAgent.url,
+                trigger: subAgent.trigger,
                 config: subAgent,
               },
               style: {
@@ -225,6 +226,7 @@ export const yamlToGraph = (yamlContent: string): GraphData => {
             documentStores: agentConfig.document_stores,
             isRemote,
             url: agentConfig.url,
+            trigger: agentConfig.trigger,
             config: agentConfig,
           },
           style: {
@@ -291,6 +293,7 @@ export const graphToYaml = (nodes: Node[], existingYaml: string): string => {
         guardrails: nodeData.guardrails || existingAgent.guardrails,
         document_stores: nodeData.documentStores || existingAgent.document_stores,
         url: nodeData.url || existingAgent.url,
+        trigger: nodeData.trigger?.type ? nodeData.trigger : undefined,
       };
       
       // Clean undefined values

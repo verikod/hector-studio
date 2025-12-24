@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Settings, Bot, Zap, Shield, FileText, Users } from "lucide-react";
+import { X, Settings, Bot, Zap, Shield, FileText, Users, Clock, Play } from "lucide-react";
 import type { Node } from "@xyflow/react";
 
 interface PropertiesPanelProps {
@@ -34,6 +34,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const agentType = data?.agentType || 'llm';
   const isWorkflow = ['sequential', 'parallel', 'loop'].includes(agentType);
   const isRemote = agentType === 'remote';
+  const isRunner = agentType === 'runner';
 
   const [localData, setLocalData] = React.useState({
     label: data?.label || '',
@@ -48,6 +49,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
     context: data?.context || { strategy: 'none', window_size: 0, budget: 0 },
     url: data?.url || '',
+    // Trigger config
+    trigger: data?.trigger || { type: '', cron: '', timezone: 'UTC', input: '', enabled: true },
   });
 
   React.useEffect(() => {
@@ -64,6 +67,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
       context: data?.context || { strategy: 'none', window_size: 0, budget: 0 },
       url: data?.url || '',
+      trigger: data?.trigger || { type: '', cron: '', timezone: 'UTC', input: '', enabled: true },
     });
   }, [data]);
 
@@ -123,6 +127,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
           >
             <option value="llm">LLM Agent</option>
+            <option value="runner">Runner (Tool Pipeline)</option>
             <option value="sequential">Sequential Workflow</option>
             <option value="parallel">Parallel Workflow</option>
             <option value="loop">Loop Workflow</option>
@@ -163,7 +168,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
 
         {/* LLM & Tools Section (for non-workflow agents) */}
-        {!isWorkflow && !isRemote && (<>
+        {!isWorkflow && !isRemote && !isRunner && (<>
           <div className="space-y-3 pt-2 border-t border-white/10">
             <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
               <Zap size={12} />
@@ -311,6 +316,98 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </div>
           )
         }
+
+        {/* Runner Agent Tools */}
+        {
+          isRunner && toolOptions.length > 0 && (
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <Play size={12} />
+                <span>Tool Pipeline</span>
+              </div>
+              <p className="text-xs text-gray-500">
+                Tools execute in order without LLM reasoning. Output of each tool feeds into the next.
+              </p>
+              <div className="space-y-1 max-h-32 overflow-y-auto bg-white/5 border border-white/10 rounded p-2">
+                {toolOptions.map((tool) => (
+                  <label key={tool} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/5 p-1 rounded">
+                    <input
+                      type="checkbox"
+                      checked={localData.tools.includes(tool)}
+                      onChange={(e) => handleMultiSelect('tools', tool, e.target.checked)}
+                      disabled={readonly}
+                      className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+                    />
+                    <span>{tool}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )
+        }
+
+        {/* Schedule Trigger Configuration */}
+        <div className="space-y-3 pt-2 border-t border-white/10">
+          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <Clock size={12} />
+            <span>Schedule Trigger</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={localData.trigger?.type === 'schedule'}
+              onChange={(e) => handleChange('trigger', {
+                ...localData.trigger,
+                type: e.target.checked ? 'schedule' : ''
+              })}
+              disabled={readonly}
+              className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
+            />
+            <label className="text-sm">Enable scheduled execution</label>
+          </div>
+
+          {localData.trigger?.type === 'schedule' && (
+            <div className="space-y-3 pl-4 border-l border-white/10">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Cron Expression</label>
+                <input
+                  type="text"
+                  value={localData.trigger?.cron || ''}
+                  onChange={(e) => handleChange('trigger', { ...localData.trigger, cron: e.target.value })}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm font-mono focus:outline-none focus:border-hector-green disabled:opacity-50"
+                  placeholder="0 9 * * *"
+                />
+                <p className="text-xs text-gray-500 mt-1">e.g., "0 9 * * *" = daily at 9am</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Timezone</label>
+                <input
+                  type="text"
+                  value={localData.trigger?.timezone || 'UTC'}
+                  onChange={(e) => handleChange('trigger', { ...localData.trigger, timezone: e.target.value })}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                  placeholder="UTC"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Input Message</label>
+                <textarea
+                  value={localData.trigger?.input || ''}
+                  onChange={(e) => handleChange('trigger', { ...localData.trigger, input: e.target.value })}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green resize-none disabled:opacity-50"
+                  rows={2}
+                  placeholder="Input for scheduled runs..."
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Advanced Section */}
         <div className="space-y-3 pt-2 border-t border-white/10">
