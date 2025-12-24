@@ -32,7 +32,6 @@ function App() {
 
   // Centralized state from stores
   const workspacesEnabled = useServersStore((s) => s.workspacesEnabled);
-  const setWorkspacesEnabled = useServersStore((s) => s.setWorkspacesEnabled);
   const isLicensed = useLicenseStore((s) => s.isLicensed);
 
   // Initialize license state from main process
@@ -41,14 +40,13 @@ function App() {
   // Subscribe to unified state changes from stateCoordinator
   useStateInit();
 
-  // Listen for app:ready event from main process
+  // Listen for app:ready event to determine initial app lifecycle state
+  // NOTE: workspacesEnabled sync is handled by useServersInit (single writer pattern)
   useEffect(() => {
     const unsubscribe = window.api.app.onReady((payload) => {
       console.log('[App] Received app:ready:', payload);
-      // Sync initial workspaces state (also happens in useServersInit, but this is faster)
-      setWorkspacesEnabled(payload.workspacesEnabled);
 
-      // Determine initial app state
+      // Determine initial app state based on payload
       if (payload.workspacesEnabled && !payload.hectorInstalled) {
         setAppState('needs_download');
       } else if (payload.needsRuntimeUpdate) {
@@ -58,7 +56,7 @@ function App() {
       }
     });
     return unsubscribe;
-  }, [setWorkspacesEnabled]);
+  }, []);
 
   // State for enable workspaces modal
   const [showEnableWorkspacesModal, setShowEnableWorkspacesModal] = useState(false);
