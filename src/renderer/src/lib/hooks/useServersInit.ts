@@ -30,14 +30,33 @@ export function useServersInit() {
             if (activeId === server.id) {
               const status = await (window as any).api.hector.getStatus();
               
-              // Map hector status to server status
-              let mappedStatus: ServerStatus = 'checking';
-              if (status === 'running') mappedStatus = 'authenticated';
-              else if (status === 'error') mappedStatus = 'error';
-              else if (status === 'stopped') mappedStatus = 'stopped';
-              else if (status === 'starting') mappedStatus = 'checking';
-              
-              setServerStatus(server.id, mappedStatus);
+              if (status === 'running') {
+                // Verify with HTTP health check before trusting binary status
+                // This handles the case where we reload and miss the status-change event
+                console.log('[useServersInit] Hector reports running, verifying health...');
+                try {
+                  const healthRes = await fetch(`${server.url}/health`, {
+                    signal: AbortSignal.timeout(3000)
+                  });
+                  if (healthRes.ok) {
+                    console.log('[useServersInit] Health verified, setting authenticated');
+                    setServerStatus(server.id, 'authenticated');
+                  } else {
+                    console.log('[useServersInit] Health check failed, setting checking');
+                    setServerStatus(server.id, 'checking');
+                  }
+                } catch (e) {
+                  console.log('[useServersInit] Health check error, setting checking:', e);
+                  setServerStatus(server.id, 'checking');
+                }
+              } else if (status === 'error') {
+                setServerStatus(server.id, 'error');
+              } else if (status === 'stopped') {
+                setServerStatus(server.id, 'stopped');
+              } else {
+                // starting or other transient state
+                setServerStatus(server.id, 'checking');
+              }
             } else {
               setServerStatus(server.id, 'stopped');
             }
@@ -102,23 +121,36 @@ export function useServersInit() {
       status: ServerStatus;
       error?: string;
     }) => {
-      const store = useServersStore.getState();
-      let server = store.servers[data.id];
+      console.log('[useServersInit] Status change event:', data.id, data.status);
+      
+      let server = useServersStore.getState().servers[data.id];
 
       // If not in store yet (race condition), fetch and sync first
       if (!server) {
         console.log('[useServersInit] Server not in store, syncing...', data.id);
-        const list = await (window as any).api.server.list();
-        store.syncFromMain(list);
-        server = useServersStore.getState().servers[data.id];
+        try {
+          const list = await (window as any).api.server.list();
+          useServersStore.getState().syncFromMain(list);
+          // Re-fetch after sync completes
+          server = useServersStore.getState().servers[data.id];
+          
+          if (!server) {
+            console.warn('[useServersInit] Server still not found after sync:', data.id);
+            return; // Can't set status on non-existent server
+          }
+        } catch (e) {
+          console.error('[useServersInit] Failed to sync servers:', e);
+          return;
+        }
       }
 
-      // Now set the status
-      setServerStatus(data.id, data.status, data.error);
+      // Now set the status - use getState() to get fresh setServerStatus
+      useServersStore.getState().setServerStatus(data.id, data.status, data.error);
 
       // If a local workspace started, switch to it
       if (data.status === 'authenticated' && server?.config.isLocal) {
-        store.selectServer(data.id);
+        console.log('[useServersInit] Auto-selecting authenticated workspace:', data.id);
+        useServersStore.getState().selectServer(data.id);
       }
     });
 

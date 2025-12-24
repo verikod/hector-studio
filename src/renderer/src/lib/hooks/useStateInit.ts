@@ -56,8 +56,16 @@ export function useStateInit() {
       
       // Sync server list to ensure UI is current
       try {
-        const servers = await (window as any).api.server.list();
-        useServersStore.getState().syncFromMain(servers);
+        const serverList = await (window as any).api.server.list();
+        useServersStore.getState().syncFromMain(serverList);
+        
+        // Validate activeServerId after sync - it might be stale from localStorage
+        const { servers, activeServerId, selectServer } = useServersStore.getState();
+        if (activeServerId && !servers[activeServerId]) {
+          console.log('[useStateInit] activeServerId not in server list, clearing:', activeServerId);
+          const firstServer = Object.keys(servers)[0];
+          selectServer(firstServer || '');
+        }
       } catch (e) {
         console.error('[useStateInit] Failed to sync servers:', e);
       }
