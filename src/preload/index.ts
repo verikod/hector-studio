@@ -11,6 +11,8 @@ const api = {
     getActive: () => ipcRenderer.invoke('server:get-active'),
     setActive: (id: string) => ipcRenderer.invoke('server:set-active', id),
     discoverAuth: (url: string) => ipcRenderer.invoke('server:discover-auth', url),
+    probe: (id: string) => ipcRenderer.invoke('server:probe', id),
+
 
     // Event subscriptions
     onServersUpdated: (callback: (servers: any[]) => void) => {

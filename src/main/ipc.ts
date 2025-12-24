@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app, shell } from 'electron'
+import { ipcMain, dialog, app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { mkdirSync } from 'fs'
 import { serverManager } from './servers/manager'
@@ -38,6 +38,19 @@ import {
 import { writeFileSync } from 'fs'
 
 export function registerIPCHandlers(): void {
+  // Bridge auth-changed events from AuthManager to renderer
+  authManager.on('auth-changed', (data: { serverUrl: string; authenticated: boolean }) => {
+    // Find server by URL to get ID
+    const servers = serverManager.getServers()
+    const server = servers.find(s => s.url === data.serverUrl)
+    if (server) {
+      const status = data.authenticated ? 'authenticated' : 'auth_required'
+      BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('server:status-change', { id: server.id, status })
+      })
+    }
+  })
+
   // Server Management
   ipcMain.handle('server:list', () => serverManager.getServers())
 
@@ -63,6 +76,44 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('server:discover-auth', async (_, url) => {
     return authManager.discoverAuth(url)
+  })
+
+  // Probe a server and emit status change - centralizes status updates
+  ipcMain.handle('server:probe', async (_, id: string) => {
+    const server = serverManager.getServer(id)
+    if (!server) {
+      console.warn('[ipc] server:probe - server not found:', id)
+      return { success: false, error: 'Server not found' }
+    }
+
+    try {
+      const authConfig = await authManager.discoverAuth(server.url)
+      let status: 'authenticated' | 'auth_required' | 'unreachable' = 'authenticated'
+      
+      if (authConfig === null) {
+        status = 'unreachable'
+      } else if (authConfig.enabled) {
+        const isAuth = await authManager.isAuthenticated(server.url)
+        status = isAuth ? 'authenticated' : 'auth_required'
+      }
+      
+      // Emit status change to renderer
+      BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('server:status-change', { id, status })
+      })
+      
+      return { success: true, status }
+    } catch (error) {
+      // Emit error status
+      BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('server:status-change', { 
+          id, 
+          status: 'unreachable', 
+          error: String(error) 
+        })
+      })
+      return { success: false, error: String(error) }
+    }
   })
 
   // Workspace Management

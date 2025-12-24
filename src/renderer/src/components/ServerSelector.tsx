@@ -60,22 +60,10 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
             const newServer = await (window as any).api.server.add(newName.trim(), newUrl.trim());
             // Sync the new server to the store
             if (newServer) {
-                const { addServer, setServerStatus } = useServersStore.getState();
-                addServer(newServer);
+                useServersStore.getState().addServer(newServer);
 
-                // Auto-detect server status
-                try {
-                    const authConfig = await (window as any).api.server.discoverAuth(newServer.url);
-                    if (authConfig?.enabled) {
-                        const isAuth = await (window as any).api.auth.isAuthenticated(newServer.url);
-                        setServerStatus(newServer.id, isAuth ? 'authenticated' : 'auth_required');
-                    } else {
-                        setServerStatus(newServer.id, 'authenticated');
-                    }
-                } catch (probeError) {
-                    console.warn('Failed to probe server:', probeError);
-                    setServerStatus(newServer.id, 'unreachable', String(probeError));
-                }
+                // Probe server status via IPC - status update comes via event
+                await (window as any).api.server.probe(newServer.id);
             }
             setNewName('');
             setNewUrl('');
@@ -138,22 +126,10 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
         // Clear chat context when switching workspaces/servers
         useStore.getState().createSession();
 
-        // Ensure server status is current
+        // Probe server if status is unknown - status update comes via IPC event
         const server = useServersStore.getState().servers[id];
         if (server && (server.status === 'added' || !server.status)) {
-            const { setServerStatus } = useServersStore.getState();
-            try {
-                const authConfig = await (window as any).api.server.discoverAuth(server.config.url);
-                if (authConfig?.enabled) {
-                    const isAuth = await (window as any).api.auth.isAuthenticated(server.config.url);
-                    setServerStatus(id, isAuth ? 'authenticated' : 'auth_required');
-                } else {
-                    setServerStatus(id, 'authenticated');
-                }
-            } catch (probeError) {
-                console.warn('Failed to probe server on select:', probeError);
-                setServerStatus(id, 'unreachable', String(probeError));
-            }
+            await (window as any).api.server.probe(id);
         }
     };
 

@@ -114,7 +114,7 @@ function App() {
   const currentSessionId = useStore((state) => state.currentSessionId);
 
   const activeServer = useServersStore((s) => s.getActiveServer());
-  const setServerStatus = useServersStore((s) => s.setServerStatus);
+  // Note: setServerStatus removed - status updates come via IPC events
 
   // Modal states
   const [loginServerId, setLoginServerId] = useState<string | null>(null);
@@ -223,34 +223,21 @@ function App() {
 
     try {
       await (window as any).api.auth.logout(server.config.url);
-      setServerStatus(serverId, 'auth_required');
+      // Status update comes via auth-changed -> server:status-change IPC event
     } catch (error) {
       console.error('Logout failed:', error);
     }
   };
 
   const handleLoginSuccess = () => {
-    if (loginServerId) {
-      setServerStatus(loginServerId, 'authenticated');
-    }
+    // Status update comes via auth-changed -> server:status-change IPC event
     setShowLoginModal(false);
   };
 
   const handleRetryConnection = async () => {
     if (!activeServer) return;
-
-    setServerStatus(activeServer.config.id, 'added');
-    try {
-      const authConfig = await (window as any).api.server.discoverAuth(activeServer.config.url);
-      if (authConfig?.enabled) {
-        const isAuth = await (window as any).api.auth.isAuthenticated(activeServer.config.url);
-        setServerStatus(activeServer.config.id, isAuth ? 'authenticated' : 'auth_required');
-      } else {
-        setServerStatus(activeServer.config.id, 'authenticated');
-      }
-    } catch (error) {
-      setServerStatus(activeServer.config.id, 'unreachable', String(error));
-    }
+    // Probe server via IPC - status update comes via server:status-change event
+    await (window as any).api.server.probe(activeServer.config.id);
   };
 
   const loginServer = loginServerId ? useServersStore.getState().servers[loginServerId] : null;
