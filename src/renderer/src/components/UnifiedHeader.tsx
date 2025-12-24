@@ -5,7 +5,7 @@ import { useServersStore } from '../store/serversStore';
 
 import { ServerSelector } from './ServerSelector';
 import { WorkspaceEnvModal } from './WorkspaceEnvModal';
-import { cn, wait } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import {
     Tooltip,
@@ -44,40 +44,17 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
 
         setStudioIsDeploying(true);
         try {
-            await api.saveConfig(studioYamlContent);
-            // Don't show success yet - wait for reload verification
-            // useStore.getState().setSuccessMessage('Configuration deployed successfully! Agents are reloading...');
+            // API now returns synchronous success/failure after reload
+            const result = await api.saveConfig(studioYamlContent);
 
-            const reloadAgentsWithRetry = async (maxRetries = 5, initialDelayMs = 500) => {
-                const { reloadAgents } = useStore.getState();
+            // Reload agents to refresh UI after successful deploy
+            await useStore.getState().reloadAgents();
 
-                for (let attempt = 0; attempt < maxRetries; attempt++) {
-                    try {
-                        // Exponential backoff
-                        const delay = initialDelayMs * Math.pow(1.5, attempt);
-                        await wait(delay);
-
-                        await reloadAgents();
-
-                        // Check freshness directly from store
-                        const agents = useStore.getState().availableAgents;
-                        if (agents.length > 0) {
-                            console.log(`✅ Agents reloaded after deploy (attempt ${attempt + 1})`);
-                            useStore.getState().setSuccessMessage('Configuration deployed and agents reloaded successfully!');
-                            return;
-                        }
-                        console.log(`Agents list empty, retrying... (attempt ${attempt + 1})`);
-                    } catch (e) {
-                        console.warn(`Failed to reload agents (attempt ${attempt + 1}/${maxRetries}):`, e);
-                    }
-                }
-                console.warn('Finished retries for agent reload - agents may still be initializing');
-                useStore.getState().setError('Configuration saved, but agents failed to reload within timeout.');
-            };
-
-            await reloadAgentsWithRetry();
+            useStore.getState().setSuccessMessage(
+                result.message || 'Configuration deployed and applied successfully!'
+            );
         } catch (error) {
-            useStore.getState().setError(`Deploy error: ${(error as Error).message}`);
+            useStore.getState().setError(`Deploy failed: ${(error as Error).message}`);
         } finally {
             setStudioIsDeploying(false);
         }

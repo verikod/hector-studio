@@ -318,6 +318,18 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('env:set-global', async (_, envVars: Record<string, string>) => {
     setGlobalEnvVars(envVars)
+    
+    // Also update .env file for the active workspace so running Hector sees the change
+    const activeWorkspace = serverManager.getActiveWorkspace()
+    if (activeWorkspace?.workspacePath) {
+      const workspaceEnvVars = activeWorkspace.envVars || {}
+      const merged = mergeEnvVars(workspaceEnvVars) // merges global + workspace vars
+      const envPath = join(activeWorkspace.workspacePath, '.hector', '.env')
+      const content = formatAsEnvFile(merged)
+      writeFileSync(envPath, content, 'utf-8')
+      console.log(`[ipc] Updated .env file for active workspace: ${envPath}`)
+    }
+    
     return { success: true }
   })
 
