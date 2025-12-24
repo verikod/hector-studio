@@ -8,12 +8,14 @@ Each piece of renderer state has **exactly one writer** to prevent race conditio
 
 | State | Initial Loader | Event Handler | Writer Count |
 |-------|---------------|---------------|--------------|
-| `workspacesEnabled` | `useServersInit` | `useStateInit` | ✅ 1 logical* |
-| `licenseStatus` | `useLicenseInit` | `useStateInit` | ✅ 1 logical* |
-| `serverStatus` | `useServersInit` | `useServersInit` | ✅ 1 |
+| `workspacesEnabled` | `useServersInit` | `useStateInit` | ✅ 1 logical |
+| `licenseStatus` | `useLicenseInit` | `useStateInit` | ✅ 1 logical |
+| `serverStatus` | `useServersInit` | `useServersInit` (IPC events) | ✅ 1 |
 | `activeServerId` | localStorage | UI components | ✅ 1 |
 
-*Initial load + event handler are the same logical writer at different phases.
+**Components NEVER write serverStatus directly.** Status changes go through:
+1. `api.server.probe(id)` → main probes → emits `server:status-change`
+2. `api.auth.logout(url)` → main logs out → emits `server:status-change`
 
 ## Key Invariants
 
