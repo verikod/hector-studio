@@ -9,8 +9,57 @@
  * See: https://docs.lemonsqueezy.com/api/license-api
  */
 
+import { net } from 'electron'
+
 // LemonSqueezy API base URL
 const LEMONSQUEEZY_API_URL = 'https://api.lemonsqueezy.com/v1'
+
+/**
+ * Helper to make POST requests using Electron's net module
+ * This is more reliable than fetch in Electron's main process
+ */
+async function makePostRequest(url: string, body: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+        console.log('[license] Making request to:', url)
+        
+        const request = net.request({
+            method: 'POST',
+            url,
+        })
+
+        request.setHeader('Accept', 'application/json')
+        request.setHeader('Content-Type', 'application/x-www-form-urlencoded')
+
+        let responseData = ''
+        let statusCode = 0
+
+        request.on('response', (response) => {
+            statusCode = response.statusCode
+            console.log('[license] Response status:', statusCode)
+            
+            response.on('data', (chunk) => {
+                responseData += chunk.toString()
+            })
+            response.on('end', () => {
+                try {
+                    resolve(JSON.parse(responseData))
+                } catch (e) {
+                    // Log the first 500 chars of response to debug HTML responses
+                    console.error('[license] Failed to parse response (status', statusCode + '):', responseData.substring(0, 500))
+                    reject(new Error(`Invalid JSON response (HTTP ${statusCode}): ${responseData.substring(0, 100)}`))
+                }
+            })
+        })
+
+        request.on('error', (error) => {
+            console.error('[license] Network request error:', error)
+            reject(error)
+        })
+
+        request.write(body)
+        request.end()
+    })
+}
 
 // Checkout URL for getting a license
 export const CHECKOUT_URL = 'https://hector-studio.lemonsqueezy.com/checkout/buy/3156a964-32ee-41f1-936e-0ed76a56e671'
@@ -37,19 +86,9 @@ export interface LicenseValidation {
  */
 export async function validateLicenseOnline(key: string): Promise<LicenseValidation> {
     try {
-        const response = await fetch(`${LEMONSQUEEZY_API_URL}/licenses/validate`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                license_key: key
-            })
-        })
-
-        const data = await response.json()
-        console.log('[license] Validation response:', data)
+        const body = new URLSearchParams({ license_key: key }).toString()
+        const data = await makePostRequest(`${LEMONSQUEEZY_API_URL}/licenses/validate`, body)
+        console.log('[license] Validation response:', JSON.stringify(data, null, 2))
         
         if (data.valid === true) {
             const licenseKey = data.license_key || {}
@@ -74,10 +113,11 @@ export async function validateLicenseOnline(key: string): Promise<LicenseValidat
         }
     } catch (error) {
         console.error('[license] Validation error:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         return {
             valid: false,
             code: 'NETWORK_ERROR',
-            message: 'Failed to validate license. Please check your internet connection.'
+            message: `Failed to validate license: ${errorMessage}`
         }
     }
 }
@@ -89,20 +129,13 @@ export async function validateLicenseOnline(key: string): Promise<LicenseValidat
  */
 export async function activateLicense(key: string, instanceName: string = 'Hector Studio'): Promise<LicenseValidation> {
     try {
-        const response = await fetch(`${LEMONSQUEEZY_API_URL}/licenses/activate`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                license_key: key,
-                instance_name: instanceName
-            })
-        })
-
-        const data = await response.json()
-        console.log('[license] Activation response:', data)
+        const body = new URLSearchParams({
+            license_key: key,
+            instance_name: instanceName
+        }).toString()
+        
+        const data = await makePostRequest(`${LEMONSQUEEZY_API_URL}/licenses/activate`, body)
+        console.log('[license] Activation response:', JSON.stringify(data, null, 2))
         
         if (data.activated === true) {
             const licenseKey = data.license_key || {}
