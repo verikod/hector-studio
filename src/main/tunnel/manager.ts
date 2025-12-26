@@ -75,12 +75,23 @@ export async function startTunnel(workspaceId: string): Promise<void> {
     // Ensure cloudflared is installed
     const binaryPath = await ensureCloudflared()
 
-    // Quick Tunnel uses: cloudflared tunnel --url http://localhost:PORT
-    // NOT "tunnel run" which requires a named tunnel ID
-    const proc = spawn(binaryPath, [
-      'tunnel',
-      '--url', `http://localhost:${port}`
-    ], {
+    let args: string[]
+    let isNamedTunnel = false
+
+    if (workspace.tunnel?.token) {
+      // Named Tunnel (Bring Your Own Token)
+      // Usage: cloudflared tunnel run --token <TOKEN>
+      console.log(`[tunnel] Starting named tunnel for workspace ${workspaceId}`)
+      args = ['tunnel', 'run', '--token', workspace.tunnel.token]
+      isNamedTunnel = true
+    } else {
+      // Quick Tunnel (Default)
+      // Usage: cloudflared tunnel --url http://localhost:PORT
+      console.log(`[tunnel] Starting quick tunnel for workspace ${workspaceId}`)
+      args = ['tunnel', '--url', `http://localhost:${port}`]
+    }
+
+    const proc = spawn(binaryPath, args, {
       detached: false,
       stdio: ['ignore', 'pipe', 'pipe']
     })
@@ -88,36 +99,41 @@ export async function startTunnel(workspaceId: string): Promise<void> {
     // Store tunnel
     tunnels.set(workspaceId, { process: proc, state })
 
+    if (isNamedTunnel) {
+        // For named tunnels, we assume it works if the process stays alive
+        // and we use the user-provided URL immediately
+        state.publicUrl = workspace.tunnel?.url || 'Custom Tunnel'
+        state.status = 'running'
+        emitTunnelStatus(state)
+    }
+
     // Parse URL from output (cloudflared outputs URL to stderr)
+    // Only needed for Quick Tunnels
     const urlPattern = /https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/
 
-    proc.stderr?.on('data', (data: Buffer) => {
+    const handleOutput = (data: Buffer) => {
       const line = data.toString()
       console.log(`[tunnel] ${line.trim()}`)
 
-      // Look for the public URL
-      const match = line.match(urlPattern)
-      if (match && state.status === 'starting') {
-        state.publicUrl = match[0]
-        state.status = 'running'
-        console.log(`[tunnel] Public URL ready: ${state.publicUrl}`)
-        emitTunnelStatus(state)
+      if (!isNamedTunnel) {
+        // Look for the public URL in Quick Tunnel mode
+        const match = line.match(urlPattern)
+        if (match && state.status === 'starting') {
+            state.publicUrl = match[0]
+            state.status = 'running'
+            console.log(`[tunnel] Public URL ready: ${state.publicUrl}`)
+            emitTunnelStatus(state)
+        }
+      } else {
+        // For named tunnels, look for connection success
+        if (line.includes('Connection') && line.includes('registered')) {
+             console.log('[tunnel] Named tunnel registered successfully')
+        }
       }
-    })
+    }
 
-    proc.stdout?.on('data', (data: Buffer) => {
-      const line = data.toString()
-      console.log(`[tunnel] ${line.trim()}`)
-
-      // Also check stdout for URL
-      const match = line.match(urlPattern)
-      if (match && state.status === 'starting') {
-        state.publicUrl = match[0]
-        state.status = 'running'
-        console.log(`[tunnel] Public URL ready: ${state.publicUrl}`)
-        emitTunnelStatus(state)
-      }
-    })
+    proc.stderr?.on('data', handleOutput)
+    proc.stdout?.on('data', handleOutput)
 
     proc.on('close', (code) => {
       console.log(`[tunnel] Process exited with code ${code}`)
@@ -140,9 +156,9 @@ export async function startTunnel(workspaceId: string): Promise<void> {
       emitTunnelStatus(state)
     })
 
-    // Timeout for URL detection
+    // Timeout for URL detection (only for Quick Tunnels) or initial startup failure
     setTimeout(() => {
-      if (state.status === 'starting') {
+      if (state.status === 'starting' && !isNamedTunnel) {
         console.warn('[tunnel] Timeout waiting for tunnel URL')
         state.status = 'error'
         state.error = 'Timeout waiting for tunnel to start'

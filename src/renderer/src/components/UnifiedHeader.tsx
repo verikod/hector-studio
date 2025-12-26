@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Rocket, DownloadCloud, Terminal, FolderOpen, Variable, LayoutTemplate, Split, MessageSquare, Globe, Loader2 } from 'lucide-react';
+import { Rocket, DownloadCloud, Terminal, FolderOpen, Variable, LayoutTemplate, Split, MessageSquare, Globe, Loader2, Settings } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useServersStore } from '../store/serversStore';
 
 import { ServerSelector } from './ServerSelector';
 import { WorkspaceEnvModal } from './WorkspaceEnvModal';
+import { TunnelConfigModal } from './TunnelConfigModal';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import {
@@ -33,6 +34,7 @@ interface TunnelState {
 export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspaces }: UnifiedHeaderProps) {
     const activeServer = useServersStore((s) => s.getActiveServer());
     const [showEnvModal, setShowEnvModal] = useState(false);
+    const [showTunnelConfig, setShowTunnelConfig] = useState(false);
     const [tunnelState, setTunnelState] = useState<TunnelState | null>(null);
     const [copied, setCopied] = useState(false);
 
@@ -360,6 +362,21 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                                     </Tooltip>
                                 </TooltipProvider>
                             )}
+
+                            {/* Settings Button */}
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={() => setShowTunnelConfig(true)}
+                                            className="h-8 w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                                        >
+                                            <Settings size={14} />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Tunnel Settings</TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </div>
                     )}
                 </div>
@@ -369,6 +386,13 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
             <WorkspaceEnvModal
                 isOpen={showEnvModal}
                 onClose={() => setShowEnvModal(false)}
+                workspace={activeServer?.config ?? null}
+            />
+
+            {/* Tunnel Config Modal */}
+            <TunnelConfigModal
+                isOpen={showTunnelConfig}
+                onClose={() => setShowTunnelConfig(false)}
                 workspace={activeServer?.config ?? null}
             />
         </>

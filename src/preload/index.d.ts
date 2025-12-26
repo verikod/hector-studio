@@ -14,7 +14,12 @@ declare global {
     isLocal?: boolean
     workspacePath?: string
     port?: number
+    envVars?: Record<string, string>
     auth?: AuthConfig
+    tunnel?: {
+      token?: string
+      url?: string
+    }
   }
 
   type AuthConfig = {

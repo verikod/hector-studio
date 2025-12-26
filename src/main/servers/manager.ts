@@ -19,6 +19,10 @@ export interface ServerConfig {
     audience: string
     clientId?: string
   }
+  tunnel?: {
+    token?: string
+    url?: string
+  }
 }
 
 interface ServerStore {
