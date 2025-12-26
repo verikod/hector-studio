@@ -23,6 +23,7 @@ export interface ServerConfig {
     token?: string
     url?: string
   }
+  secureToken?: string // Shared secret for auth
 }
 
 interface ServerStore {

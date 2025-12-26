@@ -282,6 +282,11 @@ export interface ServerConfig {
     audience: string;
     clientId?: string;
   };
+  tunnel?: {
+    token?: string;
+    url?: string;
+  };
+  secureToken?: string; // Shared secret for auth
 }
 
 // Server Status for UI state machine

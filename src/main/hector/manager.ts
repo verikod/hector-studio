@@ -9,6 +9,7 @@
  */
 
 import { app, BrowserWindow, net } from 'electron'
+import { v4 as uuidv4 } from 'uuid'
 import { spawn, ChildProcess } from 'child_process'
 import { join } from 'path'
 import { existsSync, mkdirSync, createWriteStream, chmodSync, unlinkSync, writeFileSync } from 'fs'
@@ -417,9 +418,21 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         mkdirSync(hectorDir, { recursive: true })
     }
 
+    // Ensure secure auth token exists
+    let secureToken = workspace.secureToken
+    if (!secureToken) {
+        secureToken = uuidv4()
+        serverManager.updateServer(id, { secureToken })
+        console.log(`[hector] generated secure token for workspace ${id}`)
+    }
+
     // Write .env file BEFORE starting Hector so env vars are available for config validation
     // This fixes the chicken-and-egg problem where Hector needs env vars at startup
-    const envVars = workspace.envVars || {}
+    // Also inject HECTOR_AUTH_SECRET to be picked up by the process
+    const envVars = {
+        ...(workspace.envVars || {}),
+        HECTOR_AUTH_SECRET: secureToken
+    }
     const merged = mergeEnvVars(envVars)
     if (Object.keys(merged).length > 0) {
         const envPath = join(hectorDir, '.env')
@@ -434,10 +447,11 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         'serve',
         '--port', String(port),
         '--studio',
-        '--config', configPath
+        '--config', configPath,
+        '--auth-secret', secureToken // Redundant with env but explicit
     ], {
         cwd: workspacePath,
-        env: { ...process.env },
+        env: { ...process.env, HECTOR_AUTH_SECRET: secureToken }, // Pass via env too for safety
         detached: false,
     })
 

@@ -20,6 +20,7 @@ declare global {
       token?: string
       url?: string
     }
+    secureToken?: string
   }
 
   type AuthConfig = {

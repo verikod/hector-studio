@@ -28,9 +28,15 @@ export function getBaseUrl(): string {
  * Centralized auth token retrieval - single source of truth.
  */
 export async function getAuthToken(): Promise<string | null> {
+    const activeServer = useServersStore.getState().getActiveServer();
     const baseUrl = getBaseUrl();
     
-    // Check if we're in Electron context with auth API
+    // 1. Shared Secret (Default Secure Protocol)
+    if (activeServer?.config?.secureToken) {
+        return activeServer.config.secureToken;
+    }
+    
+    // 2. OIDC / Auth0 Token (if configured)
     if ((window as any).api?.auth) {
         try {
             return await (window as any).api.auth.getToken(baseUrl);
