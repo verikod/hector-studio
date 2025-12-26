@@ -25,6 +25,7 @@ interface ServerStore {
   servers: ServerConfig[]
   activeServerId: string | null
   workspacesEnabled: boolean  // Whether local workspaces feature is enabled
+  defaultPort: number | null  // Global port for all workspaces
 }
 
 const store = new Store<ServerStore>({
@@ -32,7 +33,8 @@ const store = new Store<ServerStore>({
   defaults: {
     servers: [],
     activeServerId: null,
-    workspacesEnabled: false  // Default to false, user must opt-in
+    workspacesEnabled: false,  // Default to false, user must opt-in
+    defaultPort: null  // Set on first workspace startup
   }
 })
 
@@ -234,6 +236,20 @@ export class ServerManager {
    */
   setWorkspacesEnabled(enabled: boolean): void {
     store.set('workspacesEnabled', enabled)
+  }
+  
+  /**
+   * Get the global default port for all workspaces.
+   */
+  getDefaultPort(): number | null {
+    return store.get('defaultPort')
+  }
+  
+  /**
+   * Set the global default port for all workspaces.
+   */
+  setDefaultPort(port: number): void {
+    store.set('defaultPort', port)
   }
 }
 

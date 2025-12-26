@@ -50,6 +50,8 @@ declare global {
       isEnabled: () => Promise<boolean>
       enable: () => Promise<{ success: boolean }>
       disable: () => Promise<{ success: boolean }>
+      getPort: () => Promise<number | null>
+      setPort: (port: number) => Promise<{ success: boolean }>
     }
     auth: {
       login: (url: string) => Promise<void>
@@ -78,11 +80,25 @@ declare global {
       getPortalUrl: () => Promise<string>
     }
     app: {
+      getState: () => Promise<{ hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }>
       onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => void) => () => void
+      onStateChanged: (callback: (state: { isLicensed: boolean, licenseEmail: string | null, licenseKey: string | null, workspacesEnabled: boolean, hectorInstalled: boolean }) => void) => () => void
       checkUpdate: () => Promise<any>
       startDownload: () => Promise<void>
       installUpdate: () => Promise<void>
       onUpdateStatus: (callback: (data: { status: string, data?: any }) => void) => () => void
+    }
+    env: {
+      getGlobal: () => Promise<Record<string, string>>
+      setGlobal: (envVars: Record<string, string>) => Promise<{ success: boolean }>
+      getWorkspace: (id: string) => Promise<Record<string, string>>
+      setWorkspace: (id: string, envVars: Record<string, string>) => Promise<{ success: boolean, path: string }>
+    }
+    tunnel: {
+      start: (workspaceId: string) => Promise<{ success: boolean }>
+      stop: (workspaceId: string) => Promise<{ success: boolean }>
+      status: (workspaceId: string) => Promise<{ workspaceId: string, publicUrl: string | null, status: string, error?: string } | null>
+      onStatusChange: (callback: (state: { workspaceId: string, publicUrl: string | null, status: string, error?: string }) => void) => () => void
     }
   }
 }

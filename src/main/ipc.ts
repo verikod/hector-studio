@@ -35,6 +35,11 @@ import {
   mergeEnvVars,
   formatAsEnvFile
 } from './envVars/store'
+import {
+  startTunnel,
+  stopTunnel,
+  getTunnelState
+} from './tunnel/manager'
 import { writeFileSync } from 'fs'
 
 export function registerIPCHandlers(): void {
@@ -53,6 +58,29 @@ export function registerIPCHandlers(): void {
 
   // Server Management
   ipcMain.handle('server:list', () => serverManager.getServers())
+
+  // App State - allows renderer to request current state (for HMR/refresh)
+  ipcMain.handle('app:get-state', async () => {
+    const hectorInstalled = isHectorInstalled()
+    const workspacesEnabled = serverManager.getWorkspacesEnabled()
+    let needsRuntimeUpdate = false
+    
+    if (hectorInstalled) {
+      try {
+        const updates = await checkForUpdates()
+        needsRuntimeUpdate = updates.hasUpdate
+      } catch {
+        // Ignore errors
+      }
+    }
+    
+    return {
+      hectorInstalled,
+      hasWorkspaces: serverManager.getServers().filter(s => s.isLocal).length > 0,
+      workspacesEnabled,
+      needsRuntimeUpdate
+    }
+  })
 
   ipcMain.handle('server:add', async (_, { name, url }) => {
     return serverManager.addServer(name, url)
@@ -215,6 +243,19 @@ export function registerIPCHandlers(): void {
     return { success: true }
   })
 
+  // Port Configuration
+  ipcMain.handle('workspaces:get-port', () => {
+    return serverManager.getDefaultPort()
+  })
+
+  ipcMain.handle('workspaces:set-port', async (_, port: number) => {
+    if (port < 1024 || port > 65535) {
+      throw new Error('Port must be between 1024 and 65535')
+    }
+    serverManager.setDefaultPort(port)
+    return { success: true }
+  })
+
   // Auth Management
   ipcMain.handle('auth:login', async (_, url) => {
     const servers = serverManager.getServers()
@@ -357,5 +398,20 @@ export function registerIPCHandlers(): void {
     console.log(`[ipc] Wrote .env file to ${envPath}`)
 
     return { success: true, path: envPath }
+  })
+
+  // Tunnel Management
+  ipcMain.handle('tunnel:start', async (_, workspaceId: string) => {
+    await startTunnel(workspaceId)
+    return { success: true }
+  })
+
+  ipcMain.handle('tunnel:stop', async (_, workspaceId: string) => {
+    await stopTunnel(workspaceId)
+    return { success: true }
+  })
+
+  ipcMain.handle('tunnel:status', (_, workspaceId: string) => {
+    return getTunnelState(workspaceId)
   })
 }

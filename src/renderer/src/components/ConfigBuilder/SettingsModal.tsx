@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, RefreshCw, FolderOpen, Key, Trash2, Zap, Palette } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, RefreshCw, FolderOpen, Key, Trash2, Zap, Palette, Globe } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import { useServersStore } from "../../store/serversStore";
 import { useLicenseStore } from "../../store/licenseStore";
@@ -7,6 +7,78 @@ import { cn } from "../../lib/utils";
 
 import { useWorkspaceControl } from "../../lib/hooks/useWorkspaceControl";
 import { useLicenseControl } from "../../lib/hooks/useLicenseControl";
+
+// Port Configuration subcomponent
+function PortConfiguration() {
+  const [port, setPort] = useState<number | null>(null);
+  const [inputValue, setInputValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.api.workspaces.getPort().then((p) => {
+      setPort(p);
+      setInputValue(p?.toString() || '');
+    });
+  }, []);
+
+  const handleSave = async () => {
+    const newPort = parseInt(inputValue, 10);
+    if (isNaN(newPort) || newPort < 1024 || newPort > 65535) {
+      setError('Port must be between 1024 and 65535');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await window.api.workspaces.setPort(newPort);
+      setPort(newPort);
+      useStore.getState().setSuccessMessage('Port updated. Restart workspace to apply.');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasChanged = port !== null && inputValue !== port.toString();
+
+  return (
+    <div className="p-4 border border-white/10 rounded-lg bg-white/5">
+      <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+        <Globe size={16} className="text-blue-400" />
+        Default Port
+      </label>
+      <div className="flex gap-2">
+        <input
+          type="number"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          className="flex-1 px-3 py-2 bg-black/50 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-hector-green focus:border-transparent"
+          placeholder="e.g. 8080"
+          min={1024}
+          max={65535}
+        />
+        <button
+          onClick={handleSave}
+          disabled={!hasChanged || saving}
+          className={cn(
+            "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+            hasChanged
+              ? "bg-hector-green hover:bg-hector-green/80 text-white"
+              : "bg-white/5 text-gray-500 cursor-not-allowed"
+          )}
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+      <p className="text-xs text-gray-500 mt-2">
+        All workspaces share this port. Changes apply on next workspace start.
+      </p>
+    </div>
+  );
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -294,9 +366,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </label>
 
                 {workspacesEnabled && (
-                  <div className="text-xs text-gray-500 p-3 bg-black/20 rounded-lg">
-                    <p>When enabled, you can create and manage local workspace directories. Each workspace runs its own Hector instance with isolated configuration.</p>
-                  </div>
+                  <>
+                    <div className="text-xs text-gray-500 p-3 bg-black/20 rounded-lg">
+                      <p>When enabled, you can create and manage local workspace directories. Each workspace runs its own Hector instance with isolated configuration.</p>
+                    </div>
+
+                    {/* Port Configuration */}
+                    <PortConfiguration />
+                  </>
                 )}
               </div>
             )}

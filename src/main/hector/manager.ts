@@ -25,6 +25,22 @@ const HECTOR_COMPATIBILITY = {
     downloadBaseUrl: 'https://github.com/verikod/hector/releases/download'
 }
 
+/**
+ * Check if a port is available for use.
+ */
+async function isPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        import('net').then(({ createServer }) => {
+            const srv = createServer()
+            srv.unref()
+            srv.on('error', () => resolve(false))
+            srv.listen(port, () => {
+                srv.close(() => resolve(true))
+            })
+        }).catch(() => resolve(false))
+    })
+}
+
 // State for the single active workspace
 let hectorProcess: ChildProcess | null = null
 let activeWorkspaceId: string | null = null
@@ -366,18 +382,31 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
         mkdirSync(workspacePath, { recursive: true })
     }
 
-    // Assign a fresh free port on startup to ensure availability
-    // This fixes issues where a stored port might be taken by another app
-    const freshPort = await serverManager.findFreePort()
-    console.log(`[hector] Assigned fresh port ${freshPort} for workspace ${id}`)
+    // Use global default port if available, otherwise pick and persist one
+    let port = serverManager.getDefaultPort()
     
-    // Update persisted config
+    if (!port) {
+        // First time: pick and persist a random port
+        port = await serverManager.findFreePort()
+        serverManager.setDefaultPort(port)
+        console.log(`[hector] Initialized default port: ${port}`)
+    } else {
+        // Verify the port is available, fall back if not
+        const available = await isPortAvailable(port)
+        if (!available) {
+            console.warn(`[hector] Default port ${port} is in use, finding alternative...`)
+            port = await serverManager.findFreePort()
+            // Note: don't persist the fallback, keep original default port for next time
+        }
+    }
+    
+    // Update workspace config with the port being used
     serverManager.updateServer(id, {
-        port: freshPort,
-        url: `http://localhost:${freshPort}`
+        port,
+        url: `http://localhost:${port}`
     })
 
-    console.log(`[hector] Starting workspace ${id} on port ${freshPort}: ${workspacePath}`)
+    console.log(`[hector] Starting workspace ${id} on port ${port}: ${workspacePath}`)
     setStatus('starting')
     activeWorkspaceId = id
     emitWorkspaceStatus(id, 'starting')
@@ -403,7 +432,7 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
 
     hectorProcess = spawn(binaryPath, [
         'serve',
-        '--port', String(freshPort),
+        '--port', String(port),
         '--studio',
         '--config', configPath
     ], {
@@ -451,7 +480,7 @@ export async function startWorkspace(workspace: ServerConfig): Promise<void> {
     // This is the authoritative source of truth for 'running' status.
     // Once healthy, we emit 'running' which maps to 'authenticated' in the renderer.
     // Local workspaces in the renderer wait for this IPC event rather than probing directly.
-    const serverUrl = `http://localhost:${freshPort}`
+    const serverUrl = `http://localhost:${port}`
     console.log(`[hector] Waiting for health check at ${serverUrl}/health...`)
 
     // Set as active server immediately to ensure persistence matches intent

@@ -50,6 +50,8 @@ const api = {
     isEnabled: () => ipcRenderer.invoke('workspaces:is-enabled'),
     enable: () => ipcRenderer.invoke('workspaces:enable'),
     disable: () => ipcRenderer.invoke('workspaces:disable'),
+    getPort: () => ipcRenderer.invoke('workspaces:get-port'),
+    setPort: (port: number) => ipcRenderer.invoke('workspaces:set-port', port),
     onEnabledChanged: (callback: (enabled: boolean) => void) => {
       const handler = (_: any, enabled: boolean) => callback(enabled)
       ipcRenderer.on('workspaces:enabled-changed', handler)
@@ -105,6 +107,7 @@ const api = {
 
   // App lifecycle
   app: {
+    getState: () => ipcRenderer.invoke('app:get-state'),
     onReady: (callback: (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => void) => {
       const handler = (_event: any, payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => callback(payload)
       ipcRenderer.on('app:ready', handler)
@@ -132,6 +135,18 @@ const api = {
     setGlobal: (envVars: Record<string, string>) => ipcRenderer.invoke('env:set-global', envVars),
     getWorkspace: (id: string) => ipcRenderer.invoke('env:get-workspace', id),
     setWorkspace: (id: string, envVars: Record<string, string>) => ipcRenderer.invoke('env:set-workspace', { id, envVars })
+  },
+
+  // Tunnel Management (Cloudflare Quick Tunnels)
+  tunnel: {
+    start: (workspaceId: string) => ipcRenderer.invoke('tunnel:start', workspaceId),
+    stop: (workspaceId: string) => ipcRenderer.invoke('tunnel:stop', workspaceId),
+    status: (workspaceId: string) => ipcRenderer.invoke('tunnel:status', workspaceId),
+    onStatusChange: (callback: (state: { workspaceId: string, publicUrl: string | null, status: string, error?: string }) => void) => {
+      const handler = (_: any, state: any) => callback(state)
+      ipcRenderer.on('tunnel:status-change', handler)
+      return () => ipcRenderer.removeListener('tunnel:status-change', handler)
+    }
   }
 }
 

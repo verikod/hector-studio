@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Rocket, DownloadCloud, Terminal, FolderOpen, Variable, LayoutTemplate, Split, MessageSquare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Rocket, DownloadCloud, Terminal, FolderOpen, Variable, LayoutTemplate, Split, MessageSquare, Globe, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useServersStore } from '../store/serversStore';
 
@@ -23,9 +23,18 @@ interface UnifiedHeaderProps {
     onEnableWorkspaces: () => void;
 }
 
+interface TunnelState {
+    workspaceId: string;
+    publicUrl: string | null;
+    status: 'stopped' | 'starting' | 'running' | 'error';
+    error?: string;
+}
+
 export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspaces }: UnifiedHeaderProps) {
     const activeServer = useServersStore((s) => s.getActiveServer());
     const [showEnvModal, setShowEnvModal] = useState(false);
+    const [tunnelState, setTunnelState] = useState<TunnelState | null>(null);
+    const [copied, setCopied] = useState(false);
 
     // Studio State
     const studioViewMode = useStore((s) => s.studioViewMode);
@@ -38,6 +47,53 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
 
     // Check if we should show studio controls
     const isStudioEnabled = activeServer?.status === 'authenticated' && isServerStudioEnabled;
+
+    // Subscribe to tunnel status changes
+    useEffect(() => {
+        const unsubscribe = (window as any).api.tunnel.onStatusChange((state: TunnelState) => {
+            if (activeServer?.config.id === state.workspaceId) {
+                setTunnelState(state);
+            }
+        });
+        return () => unsubscribe();
+    }, [activeServer?.config.id]);
+
+    // Fetch initial tunnel state when workspace changes
+    useEffect(() => {
+        if (activeServer?.config.isLocal && activeServer?.config.id) {
+            (window as any).api.tunnel.status(activeServer.config.id).then((state: TunnelState | null) => {
+                setTunnelState(state);
+            });
+        } else {
+            setTunnelState(null);
+        }
+    }, [activeServer?.config.id, activeServer?.config.isLocal]);
+
+    const handleStartTunnel = async () => {
+        if (!activeServer?.config.id) return;
+        try {
+            await (window as any).api.tunnel.start(activeServer.config.id);
+        } catch (error) {
+            useStore.getState().setError(`Failed to start tunnel: ${(error as Error).message}`);
+        }
+    };
+
+    const handleStopTunnel = async () => {
+        if (!activeServer?.config.id) return;
+        try {
+            await (window as any).api.tunnel.stop(activeServer.config.id);
+        } catch (error) {
+            useStore.getState().setError(`Failed to stop tunnel: ${(error as Error).message}`);
+        }
+    };
+
+    const handleCopyUrl = () => {
+        if (tunnelState?.publicUrl) {
+            navigator.clipboard.writeText(tunnelState.publicUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
 
     const handleDeploy = async () => {
         if (!isStudioEnabled || !studioIsValidYaml || studioIsDeploying) return;
@@ -72,6 +128,9 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };
+
+    const isTunnelRunning = tunnelState?.status === 'running';
+    const isTunnelStarting = tunnelState?.status === 'starting';
 
     return (
         <>
@@ -226,6 +285,83 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
                             </Button>
                         </>
                     )}
+
+                    {/* Share Toggle Button - Push down/up style */}
+                    {activeServer?.config.isLocal && activeServer?.status === 'authenticated' && (
+                        <div className="flex items-center gap-1">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            onClick={isTunnelRunning ? handleStopTunnel : handleStartTunnel}
+                                            disabled={isTunnelStarting}
+                                            className={cn(
+                                                "flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium relative transition-all",
+                                                isTunnelRunning
+                                                    ? "bg-black/40 text-green-400 border border-green-500/50 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_0_15px_rgba(34,197,94,0.3)]"
+                                                    : isTunnelStarting
+                                                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 cursor-wait"
+                                                        : "bg-blue-500 hover:bg-blue-600 text-white shadow-[0_2px_4px_rgba(0,0,0,0.3),0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_2px_6px_rgba(0,0,0,0.4),0_0_20px_rgba(59,130,246,0.4)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                                            )}
+                                        >
+                                            {isTunnelStarting ? (
+                                                <Loader2 size={14} className="animate-spin" />
+                                            ) : (
+                                                <Globe size={14} />
+                                            )}
+                                            <span className="hidden sm:inline">
+                                                {isTunnelStarting
+                                                    ? 'Starting...'
+                                                    : isTunnelRunning && tunnelState?.publicUrl
+                                                        ? (() => {
+                                                            const subdomain = tunnelState.publicUrl.replace('https://', '').split('.')[0];
+                                                            return subdomain.length > 8 ? `${subdomain.slice(0, 8)}...` : subdomain;
+                                                        })()
+                                                        : 'Share'
+                                                }
+                                            </span>
+                                            {/* Pulsing dot when active */}
+                                            {isTunnelRunning && (
+                                                <>
+                                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full animate-ping opacity-75" />
+                                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full" />
+                                                </>
+                                            )}
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        {isTunnelStarting
+                                            ? 'Starting tunnel...'
+                                            : isTunnelRunning
+                                                ? 'Click to stop sharing'
+                                                : 'Share publicly via Cloudflare Tunnel'
+                                        }
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+
+                            {/* Copy button - only visible when active */}
+                            {isTunnelRunning && tunnelState?.publicUrl && (
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <button
+                                                onClick={handleCopyUrl}
+                                                className="h-8 w-8 flex items-center justify-center rounded-md text-green-400 hover:text-green-300 hover:bg-green-500/10 transition-colors"
+                                            >
+                                                {copied ? (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                ) : (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                )}
+                                            </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{copied ? 'Copied!' : 'Copy URL'}</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            )}
+                        </div>
+                    )}
                 </div>
             </header>
 
@@ -238,3 +374,4 @@ export function UnifiedHeader({ onLoginRequest, onLogoutRequest, onEnableWorkspa
         </>
     );
 }
+

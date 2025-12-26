@@ -42,12 +42,14 @@ function App() {
   useStateInit();
 
   // Listen for app:ready event to determine initial app lifecycle state
+  // Also request current state on mount (handles HMR/refresh where event isn't re-emitted)
   // NOTE: workspacesEnabled sync is handled by useServersInit (single writer pattern)
   useEffect(() => {
-    const unsubscribe = window.api.app.onReady((payload) => {
-      console.log('[App] Received app:ready:', payload);
+    // Handler for both event and direct call
+    const handlePayload = (payload: { hectorInstalled: boolean, hasWorkspaces: boolean, workspacesEnabled: boolean, needsRuntimeUpdate: boolean }) => {
+      console.log('[App] Received app state:', payload);
 
-      // Determine initial app state based on payload
+      // Determine app state based on payload
       if (payload.workspacesEnabled && !payload.hectorInstalled) {
         setAppState('needs_download');
       } else if (payload.needsRuntimeUpdate) {
@@ -55,7 +57,17 @@ function App() {
       } else {
         setAppState('ready');
       }
+    };
+
+    // Request current state immediately (handles HMR/refresh)
+    window.api.app.getState().then(handlePayload).catch(err => {
+      console.error('[App] Failed to get state:', err);
+      // Fallback to ready to not block the app
+      setAppState('ready');
     });
+
+    // Also listen for event (handles initial load)
+    const unsubscribe = window.api.app.onReady(handlePayload);
     return unsubscribe;
   }, []);
 
