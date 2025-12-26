@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 import { WorkspaceEnvModal } from './WorkspaceEnvModal';
 import { Plus, Server, LogIn, LogOut, Trash2, Check, ChevronDown, FolderOpen } from 'lucide-react';
@@ -50,6 +50,16 @@ export function ServerSelector({ onLoginRequest, onLogoutRequest, onEnableWorksp
     const serverList = Object.values(servers).filter(s =>
         workspacesEnabled || !s.config.isLocal
     );
+
+    // Listen for programmatic open requests from welcome screen
+    useEffect(() => {
+        const handleOpenSelector = () => {
+            setIsOpen(true);
+            setShowAddForm(true); // Go directly to add form
+        };
+        window.addEventListener('open-server-selector', handleOpenSelector);
+        return () => window.removeEventListener('open-server-selector', handleOpenSelector);
+    }, []);
 
     const handleAddServer = async (e: React.MouseEvent) => {
         e.preventDefault();

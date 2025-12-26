@@ -31,7 +31,8 @@ export class AuthManager extends EventEmitter {
           clientId: data.auth.client_id
         }
       }
-      return null
+      // Server is reachable but no auth configured - return enabled: false
+      return { enabled: false, type: '', issuer: '', audience: '' }
     } catch (error: any) {
       // Suppress connection refused errors during startup/polling
       if (error.message && (error.message.includes('ERR_CONNECTION_REFUSED') || error.code === 'ECONNREFUSED')) {

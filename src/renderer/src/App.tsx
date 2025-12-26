@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+import { Cpu, FolderOpen, Sparkles, Plus, Globe } from "lucide-react";
 import hectorIcon from "./assets/hector.png";
 import { StudioMode } from "./components/ConfigBuilder/StudioMode";
 import { SettingsModal } from "./components/ConfigBuilder/SettingsModal";
@@ -125,12 +126,9 @@ function App() {
   const [showLogDrawer, setShowLogDrawer] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
 
-  // Show license modal on app launch if not licensed (after initial check)
-  useEffect(() => {
-    if (isLicensed === false) {
-      setShowLicenseModal(true);
-    }
-  }, [isLicensed]);
+  // License modal no longer auto-shows on launch
+  // - Welcome page has "Activate Free License" button for unlicensed users
+  // - Banner appears when connected to remote server without license
 
   // Expose license status for debugging
   useEffect(() => {
@@ -288,12 +286,110 @@ function App() {
           <StudioMode />
         ) : !activeServer ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 bg-gray-900/20">
-            <div className="text-center">
+            <div className="text-center max-w-md px-6">
               <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
                 <img src={hectorIcon} alt="Hector" className="w-full h-full object-contain" />
               </div>
-              <h2 className="text-lg font-medium text-gray-300 mb-2">Welcome to Hector Studio</h2>
-              <p className="text-sm text-gray-400">Add or select a server to begin</p>
+              <h2 className="text-xl font-medium text-gray-200 mb-2">Welcome to Hector Studio</h2>
+              <p className="text-sm text-gray-400 mb-6">
+                Build, configure, and deploy AI agents with a visual interface.
+              </p>
+
+              {isLicensed ? (
+                <>
+                  {/* Licensed: Feature showcase */}
+                  <div className="grid grid-cols-3 gap-3 mb-6">
+                    <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                      <Cpu size={20} className="text-hector-green" />
+                      <span className="text-xs text-gray-300">Local Runtime</span>
+                      <span className="text-[10px] text-gray-500">Run agents locally</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                      <FolderOpen size={20} className="text-blue-400" />
+                      <span className="text-xs text-gray-300">Workspaces</span>
+                      <span className="text-[10px] text-gray-500">Multi-project support</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                      <Sparkles size={20} className="text-amber-400" />
+                      <span className="text-xs text-gray-300">Visual Builder</span>
+                      <span className="text-[10px] text-gray-500">Drag & drop design</span>
+                    </div>
+                  </div>
+
+                  {/* Licensed: Action buttons */}
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={handleEnableWorkspaces}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-hector-green hover:bg-hector-green/80 text-white"
+                    >
+                      <Plus size={16} />
+                      <span>Add Workspace</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const event = new CustomEvent('open-server-selector');
+                        window.dispatchEvent(event);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10"
+                    >
+                      <Globe size={16} />
+                      <span>Remote Server</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Unlicensed: Show value proposition */}
+                  <p className="text-xs text-gray-500 text-center mb-4">
+                    Enable <span className="text-gray-300 font-medium">Studio Mode</span> to unlock:
+                  </p>
+                  <div className="grid grid-cols-3 gap-3 mb-6">
+                    <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                      <Cpu size={20} className="text-hector-green" />
+                      <span className="text-xs text-gray-300">Local Runtime</span>
+                      <span className="text-[10px] text-gray-500">Run agents locally</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                      <FolderOpen size={20} className="text-blue-400" />
+                      <span className="text-xs text-gray-300">Workspaces</span>
+                      <span className="text-[10px] text-gray-500">Multi-project support</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                      <Sparkles size={20} className="text-amber-400" />
+                      <span className="text-xs text-gray-300">Visual Builder</span>
+                      <span className="text-[10px] text-gray-500">Drag & drop design</span>
+                    </div>
+                  </div>
+
+                  {/* CTA */}
+                  <div className="flex flex-col gap-3 items-center">
+                    <button
+                      onClick={() => setShowLicenseModal(true)}
+                      className="flex items-center gap-2 px-5 py-3 rounded-lg font-medium text-sm transition-all bg-hector-green hover:bg-hector-green/80 text-white w-full justify-center"
+                    >
+                      <Sparkles size={16} />
+                      <span>Activate Free License</span>
+                    </button>
+
+                    <div className="flex items-center gap-3 text-gray-500 text-xs w-full">
+                      <div className="flex-1 h-px bg-gray-800" />
+                      <span>or</span>
+                      <div className="flex-1 h-px bg-gray-800" />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const event = new CustomEvent('open-server-selector');
+                        window.dispatchEvent(event);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10"
+                    >
+                      <Globe size={16} />
+                      <span>Add Remote Server</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (
@@ -303,8 +399,8 @@ function App() {
         )}
       </main>
 
-      {/* License Upgrade Banner - shown for unlicensed users */}
-      {isLicensed === false && (
+      {/* License Upgrade Banner - only show when connected to a server (not on welcome page) */}
+      {isLicensed === false && activeServer && (
         <button
           onClick={() => setShowLicenseModal(true)}
           className="w-full px-4 py-2.5 bg-gradient-to-r from-hector-green/20 to-blue-500/20 border-t border-hector-green/30 hover:from-hector-green/30 hover:to-blue-500/30 transition-all group"
