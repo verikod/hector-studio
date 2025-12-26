@@ -143,7 +143,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       {/* Modal */}
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
         <div
-          className="bg-gradient-to-br from-hector-darker to-black border border-white/20 rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto animate-in zoom-in-95 duration-200"
+          className="bg-gradient-to-br from-hector-darker to-black border border-white/20 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col pointer-events-auto animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -198,7 +198,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-6 min-h-[280px]">
+          <div className="flex-1 overflow-y-auto p-6 min-h-[400px]">
             {/* General Tab */}
             {activeTab === 'general' && (
               <div className="space-y-6">

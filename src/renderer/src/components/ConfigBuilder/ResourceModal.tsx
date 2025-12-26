@@ -41,7 +41,7 @@ export const ResourceModal: React.FC<ResourceModalProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-[400px]">
                     {children}
                 </div>
 

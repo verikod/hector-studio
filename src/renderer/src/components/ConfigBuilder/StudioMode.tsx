@@ -33,7 +33,7 @@ export const StudioMode: React.FC = () => {
   const setEditorTheme = useStore((s) => s.setEditorTheme);
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [nodes, setNodes] = useState<any[]>([]);
 
   // Refs

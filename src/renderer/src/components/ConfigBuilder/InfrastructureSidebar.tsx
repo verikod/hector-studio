@@ -87,7 +87,7 @@ interface SectionHeaderProps {
 const SectionHeader: React.FC<SectionHeaderProps> = ({
   icon, iconBgClass, title, count, isExpanded, dotColor, onToggle, onAdd
 }) => (
-  <div className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors group">
+  <div className="w-full px-3 py-2 flex items-center justify-between hover:bg-white/5 transition-colors group">
     <button onClick={onToggle} className="flex items-center gap-3 flex-1">
       <div className={`w-8 h-8 rounded ${iconBgClass} flex items-center justify-center group-hover:opacity-80 transition-opacity`}>
         {icon}
@@ -439,8 +439,28 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
         </button>
       </div>
 
-      {/* Global Config */}
-      <div className="flex-none p-2 w-full border-b border-white/10 flex flex-col gap-1 items-center">
+      {/* Resources List */}
+      <div className="flex-1 w-full overflow-y-auto custom-scrollbar flex flex-col items-center py-2 gap-2">
+        {SECTIONS.map((section) => (
+          <button
+            key={section.key}
+            onClick={() => {
+              setExpandedSection(section.key);
+              if (onToggle) onToggle();
+            }}
+            className="p-2 hover:bg-white/5 rounded transition-colors relative group"
+            title={`${section.title} (${Object.keys(infrastructure[section.key]).length})`}
+          >
+            <section.icon size={20} className={section.color} />
+            <span className="absolute -top-1 -right-1 bg-black/80 text-[10px] text-gray-400 px-1 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+              {Object.keys(infrastructure[section.key]).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Global Config - Bottom */}
+      <div className="flex-none p-2 w-full border-t border-white/10 flex flex-col gap-1 items-center">
         <button
           onClick={() => setGlobalConfigModalOpen(true)}
           className="p-2 bg-hector-green/10 hover:bg-hector-green/20 text-hector-green border border-hector-green/20 rounded transition-colors"
@@ -456,50 +476,16 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
           <Variable size={16} />
         </button>
       </div>
-
-      {/* Resources List */}
-      <div className="flex-1 w-full overflow-y-auto custom-scrollbar flex flex-col items-center py-2 gap-2">
-        {SECTIONS.map((section) => (
-          <button
-            key={section.key}
-            onClick={onToggle}
-            className="p-2 hover:bg-white/5 rounded transition-colors relative group"
-            title={`${section.title} (${Object.keys(infrastructure[section.key]).length})`}
-          >
-            <section.icon size={20} className={section.color} />
-            <span className="absolute -top-1 -right-1 bg-black/80 text-[10px] text-gray-400 px-1 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-              {Object.keys(infrastructure[section.key]).length}
-            </span>
-          </button>
-        ))}
-      </div>
     </div>
   ) : (
     <div className="w-64 bg-black/40 border-r border-white/10 flex flex-col overflow-hidden">
-      <div className="flex-none px-4 py-3 border-b border-white/10 flex items-center justify-between">
+      <div className="flex-none h-[45px] px-3 border-b border-white/10 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Resources</h2>
         <div className="flex items-center gap-1">
           <button onClick={onToggle} className="p-1 text-gray-400 hover:text-white transition-colors" title="Collapse sidebar">
             <Layers size={16} className="rotate-90" />
           </button>
         </div>
-      </div>
-
-      <div className="flex-none p-2 border-b border-white/10 space-y-2">
-        <button
-          onClick={() => setGlobalConfigModalOpen(true)}
-          className="w-full flex items-center gap-3 px-3 py-2 bg-hector-green/10 hover:bg-hector-green/20 text-hector-green border border-hector-green/20 rounded transition-colors group"
-        >
-          <Globe size={16} />
-          <span className="text-sm font-medium">Global Settings</span>
-        </button>
-        <button
-          onClick={() => setGlobalEnvModalOpen(true)}
-          className="w-full flex items-center gap-3 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded transition-colors group"
-        >
-          <Variable size={16} />
-          <span className="text-sm font-medium">Environment Variables</span>
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -535,6 +521,24 @@ export const InfrastructureSidebar: React.FC<InfrastructureSidebarProps> = React
             )}
           </div>
         ))}
+      </div>
+
+      {/* Global Settings - Bottom */}
+      <div className="flex-none p-2 border-t border-white/10 space-y-2">
+        <button
+          onClick={() => setGlobalConfigModalOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2 bg-hector-green/10 hover:bg-hector-green/20 text-hector-green border border-hector-green/20 rounded transition-colors group"
+        >
+          <Globe size={16} />
+          <span className="text-sm font-medium">Global Settings</span>
+        </button>
+        <button
+          onClick={() => setGlobalEnvModalOpen(true)}
+          className="w-full flex items-center gap-3 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded transition-colors group"
+        >
+          <Variable size={16} />
+          <span className="text-sm font-medium">Environment Variables</span>
+        </button>
       </div>
     </div>
   );
