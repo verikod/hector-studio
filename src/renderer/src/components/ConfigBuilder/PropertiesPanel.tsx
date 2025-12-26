@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Settings, Bot, Zap, Shield, FileText, Users, Clock, Play } from "lucide-react";
+import { X, Settings, Bot, Zap, Shield, FileText, Users, Clock, Play, Webhook } from "lucide-react";
 import type { Node } from "@xyflow/react";
 
 interface PropertiesPanelProps {
@@ -49,8 +49,21 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
     context: data?.context || { strategy: 'none', window_size: 0, budget: 0 },
     url: data?.url || '',
-    // Trigger config
-    trigger: data?.trigger || { type: '', cron: '', timezone: 'UTC', input: '', enabled: true },
+    // Trigger config (schedule or webhook)
+    trigger: data?.trigger || {
+      type: '',
+      enabled: true,
+      // Schedule fields
+      cron: '',
+      timezone: 'UTC',
+      input: '',
+      // Webhook fields
+      path: '',
+      methods: ['POST'],
+      secret: '',
+      signature_header: '',
+      response: { mode: 'sync' }
+    },
   });
 
   const [customTool, setCustomTool] = React.useState('');
@@ -466,29 +479,38 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           )
         }
 
-        {/* Schedule Trigger Configuration */}
+        {/* Trigger Configuration */}
         <div className="space-y-3 pt-2 border-t border-white/10">
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
-            <Clock size={12} />
-            <span>Schedule Trigger</span>
+            <Zap size={12} />
+            <span>Trigger</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={localData.trigger?.type === 'schedule'}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Trigger Type</label>
+            <select
+              value={localData.trigger?.type || ''}
               onChange={(e) => handleChange('trigger', {
                 ...localData.trigger,
-                type: e.target.checked ? 'schedule' : ''
+                type: e.target.value
               })}
               disabled={readonly}
-              className="rounded border-white/20 bg-white/5 text-hector-green focus:ring-hector-green"
-            />
-            <label className="text-sm">Enable scheduled execution</label>
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+            >
+              <option value="">None</option>
+              <option value="schedule">Schedule (Cron)</option>
+              <option value="webhook">Webhook (HTTP)</option>
+            </select>
           </div>
 
+          {/* Schedule Trigger Fields */}
           {localData.trigger?.type === 'schedule' && (
             <div className="space-y-3 pl-4 border-l border-white/10">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Clock size={12} />
+                <span>Schedule Configuration</span>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Cron Expression</label>
                 <input
@@ -525,6 +547,72 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   placeholder="Input for scheduled runs..."
                 />
               </div>
+            </div>
+          )}
+
+          {/* Webhook Trigger Fields */}
+          {localData.trigger?.type === 'webhook' && (
+            <div className="space-y-3 pl-4 border-l border-white/10">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Webhook size={12} />
+                <span>Webhook Configuration</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Path</label>
+                <input
+                  type="text"
+                  value={localData.trigger?.path || ''}
+                  onChange={(e) => handleChange('trigger', { ...localData.trigger, path: e.target.value })}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm font-mono focus:outline-none focus:border-hector-green disabled:opacity-50"
+                  placeholder="/webhooks/my-agent"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave empty for default: /webhooks/{'{agent-name}'}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Response Mode</label>
+                <select
+                  value={localData.trigger?.response?.mode || 'sync'}
+                  onChange={(e) => handleChange('trigger', {
+                    ...localData.trigger,
+                    response: { ...localData.trigger?.response, mode: e.target.value }
+                  })}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                >
+                  <option value="sync">Sync (wait for completion)</option>
+                  <option value="async">Async (return task ID)</option>
+                  <option value="callback">Callback (POST result to URL)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">HMAC Secret</label>
+                <input
+                  type="text"
+                  value={localData.trigger?.secret || ''}
+                  onChange={(e) => handleChange('trigger', { ...localData.trigger, secret: e.target.value })}
+                  disabled={readonly}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                  placeholder="Optional signature verification secret"
+                />
+              </div>
+
+              {localData.trigger?.secret && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Signature Header</label>
+                  <input
+                    type="text"
+                    value={localData.trigger?.signature_header || ''}
+                    onChange={(e) => handleChange('trigger', { ...localData.trigger, signature_header: e.target.value })}
+                    disabled={readonly}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                    placeholder="X-Webhook-Signature"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

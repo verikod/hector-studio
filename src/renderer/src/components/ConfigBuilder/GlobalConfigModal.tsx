@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ResourceModal, FormField, TextInput, SelectInput, ToggleInput } from './ResourceModal';
 import { parseConfig, serializeConfig } from '../../lib/config-utils';
 import { useStore } from '../../store/useStore';
-import { Database, Activity } from 'lucide-react';
+import { Database, Activity, Shield, FileText, Plus, X } from 'lucide-react';
 
 interface GlobalConfigModalProps {
     isOpen: boolean;
@@ -16,7 +16,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
     const yamlContent = useStore((s) => s.studioYamlContent);
     const setYamlContent = useStore((s) => s.setStudioYamlContent);
 
-    const [activeTab, setActiveTab] = useState<'storage' | 'observability'>('storage');
+    const [activeTab, setActiveTab] = useState<'storage' | 'observability' | 'rate_limiting' | 'logger'>('storage');
     const [databaseOptions, setDatabaseOptions] = useState<string[]>([]);
     const [embedderOptions, setEmbedderOptions] = useState<string[]>([]);
 
@@ -33,8 +33,6 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
     const [memoryChromemCompress, setMemoryChromemCompress] = useState(false);
 
     const [checkpointEnabled, setCheckpointEnabled] = useState(false);
-    const [checkpointBackend, setCheckpointBackend] = useState('memory');
-    const [checkpointDb, setCheckpointDb] = useState('');
     const [checkpointStrategy, setCheckpointStrategy] = useState('event');
     const [checkpointInterval, setCheckpointInterval] = useState('5');
     const [checkpointAfterTools, setCheckpointAfterTools] = useState(false);
@@ -49,6 +47,18 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
     const [tracingEndpoint, setTracingEndpoint] = useState('');
     const [samplingRate, setSamplingRate] = useState('1.0');
 
+    // Rate Limiting State
+    const [rateLimitEnabled, setRateLimitEnabled] = useState(false);
+    const [rateLimitScope, setRateLimitScope] = useState('global');
+    const [rateLimitBackend, setRateLimitBackend] = useState('memory');
+    const [rateLimitDb, setRateLimitDb] = useState('');
+    const [rateLimits, setRateLimits] = useState<Array<{ type: string; window: string; limit: string }>>([]);
+
+    // Logger State
+    const [logLevel, setLogLevel] = useState('info');
+    const [logFile, setLogFile] = useState('');
+    const [logFormat, setLogFormat] = useState('text');
+
     useEffect(() => {
         if (isOpen) {
             const config = parseConfig(yamlContent);
@@ -60,14 +70,12 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
             setSessionsDb(config.storage?.sessions?.database || '');
             setMemoryBackend(config.storage?.memory?.backend || 'memory');
             setMemoryEmbedder(config.storage?.memory?.embedder || '');
-            setMemoryDb(config.storage?.memory?.database || '');
+            setMemoryDb((config.storage?.memory as any)?.database || '');
             setMemoryVectorType(config.storage?.memory?.vector_provider?.type || 'chromem');
             setMemoryChromemPath(config.storage?.memory?.vector_provider?.chromem?.persist_path || '');
             setMemoryChromemCompress(config.storage?.memory?.vector_provider?.chromem?.compress || false);
 
             setCheckpointEnabled(config.storage?.checkpoint?.enabled || false);
-            setCheckpointBackend(config.storage?.checkpoint?.backend || 'memory');
-            setCheckpointDb(config.storage?.checkpoint?.database || '');
             setCheckpointStrategy(config.storage?.checkpoint?.strategy || 'event');
             setCheckpointInterval(config.storage?.checkpoint?.interval?.toString() || '5');
             setCheckpointAfterTools(config.storage?.checkpoint?.after_tools || false);
@@ -81,6 +89,22 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
             setTracingExporter(config.observability?.tracing?.exporter || 'otlp');
             setTracingEndpoint(config.observability?.tracing?.endpoint || '');
             setSamplingRate(config.observability?.tracing?.sampling_rate?.toString() || '1.0');
+
+            // Rate Limiting
+            setRateLimitEnabled(config.rate_limiting?.enabled || false);
+            setRateLimitScope(config.rate_limiting?.scope || 'global');
+            setRateLimitBackend(config.rate_limiting?.backend || 'memory');
+            setRateLimitDb(config.rate_limiting?.sql_database || '');
+            setRateLimits((config.rate_limiting?.limits || []).map(l => ({
+                type: l.type || 'requests',
+                window: l.window || '1m',
+                limit: l.limit?.toString() || '100'
+            })));
+
+            // Logger
+            setLogLevel(config.logger?.level || 'info');
+            setLogFile(config.logger?.file || '');
+            setLogFormat(config.logger?.format || 'text');
 
             // Databases
             setDatabaseOptions(Object.keys(config.databases || {}));
@@ -111,9 +135,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
 
         const checkpointConfig: any = {
             enabled: checkpointEnabled,
-            backend: checkpointBackend,
         };
-        if (checkpointBackend !== 'memory' && checkpointDb) checkpointConfig.database = checkpointDb;
         if (checkpointEnabled) {
             checkpointConfig.strategy = checkpointStrategy;
             if (checkpointStrategy !== 'event') checkpointConfig.interval = parseInt(checkpointInterval);
@@ -150,6 +172,34 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
             config.observability = obsConfig;
         } else {
             delete config.observability;
+        }
+
+        // Update Rate Limiting
+        if (rateLimitEnabled) {
+            config.rate_limiting = {
+                enabled: true,
+                scope: rateLimitScope,
+                backend: rateLimitBackend,
+                sql_database: rateLimitBackend === 'sql' ? rateLimitDb : undefined,
+                limits: rateLimits.filter(l => l.limit).map(l => ({
+                    type: l.type,
+                    window: l.window,
+                    limit: parseInt(l.limit) || 100
+                }))
+            };
+        } else {
+            delete config.rate_limiting;
+        }
+
+        // Update Logger
+        if (logLevel !== 'info' || logFile || logFormat !== 'text') {
+            config.logger = {
+                level: logLevel,
+                file: logFile || undefined,
+                format: logFormat
+            };
+        } else {
+            delete config.logger;
         }
 
         setYamlContent(serializeConfig(config));
@@ -191,6 +241,26 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                 >
                     <Activity size={16} />
                     Observability
+                </button>
+                <button
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rate_limiting'
+                        ? 'border-hector-green text-white'
+                        : 'border-transparent text-gray-400 hover:text-white'
+                        }`}
+                    onClick={() => setActiveTab('rate_limiting')}
+                >
+                    <Shield size={16} />
+                    Rate Limiting
+                </button>
+                <button
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'logger'
+                        ? 'border-hector-green text-white'
+                        : 'border-transparent text-gray-400 hover:text-white'
+                        }`}
+                    onClick={() => setActiveTab('logger')}
+                >
+                    <FileText size={16} />
+                    Logger
                 </button>
             </div>
 
@@ -305,23 +375,6 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
 
                         {checkpointEnabled && (
                             <>
-                                <FormField label="Backend">
-                                    <SelectInput
-                                        value={checkpointBackend}
-                                        onChange={setCheckpointBackend}
-                                        options={backendOptions}
-                                    />
-                                </FormField>
-                                {checkpointBackend !== 'memory' && (
-                                    <FormField label="Database">
-                                        <SelectInput
-                                            value={checkpointDb}
-                                            onChange={setCheckpointDb}
-                                            options={dbSelectOptions}
-                                            placeholder="Select a configured database..."
-                                        />
-                                    </FormField>
-                                )}
 
                                 <FormField label="Strategy">
                                     <SelectInput
@@ -433,6 +486,142 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                             </>
                         )}
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'rate_limiting' && (
+                <div className="space-y-6">
+                    <ToggleInput
+                        checked={rateLimitEnabled}
+                        onChange={setRateLimitEnabled}
+                        label="Enable Rate Limiting"
+                    />
+
+                    {rateLimitEnabled && (
+                        <>
+                            <FormField label="Scope">
+                                <SelectInput
+                                    value={rateLimitScope}
+                                    onChange={setRateLimitScope}
+                                    options={[
+                                        { value: 'global', label: 'Global' },
+                                        { value: 'per_agent', label: 'Per Agent' },
+                                        { value: 'per_user', label: 'Per User' },
+                                    ]}
+                                />
+                            </FormField>
+
+                            <FormField label="Backend">
+                                <SelectInput
+                                    value={rateLimitBackend}
+                                    onChange={setRateLimitBackend}
+                                    options={backendOptions}
+                                />
+                            </FormField>
+
+                            {rateLimitBackend === 'sql' && (
+                                <FormField label="Database">
+                                    <SelectInput
+                                        value={rateLimitDb}
+                                        onChange={setRateLimitDb}
+                                        options={dbSelectOptions}
+                                        placeholder="Select a configured database..."
+                                    />
+                                </FormField>
+                            )}
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Limits</div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setRateLimits([...rateLimits, { type: 'requests', window: '1m', limit: '100' }])}
+                                        className="flex items-center gap-1 text-xs text-hector-green hover:text-hector-green/80"
+                                    >
+                                        <Plus size={14} /> Add Limit
+                                    </button>
+                                </div>
+                                {rateLimits.map((limit, idx) => (
+                                    <div key={idx} className="flex gap-2 items-center">
+                                        <SelectInput
+                                            value={limit.type}
+                                            onChange={(v) => {
+                                                const updated = [...rateLimits];
+                                                updated[idx].type = v;
+                                                setRateLimits(updated);
+                                            }}
+                                            options={[
+                                                { value: 'requests', label: 'Requests' },
+                                                { value: 'tokens', label: 'Tokens' },
+                                            ]}
+                                        />
+                                        <TextInput
+                                            value={limit.window}
+                                            onChange={(v) => {
+                                                const updated = [...rateLimits];
+                                                updated[idx].window = v;
+                                                setRateLimits(updated);
+                                            }}
+                                            placeholder="1m"
+                                        />
+                                        <TextInput
+                                            value={limit.limit}
+                                            onChange={(v) => {
+                                                const updated = [...rateLimits];
+                                                updated[idx].limit = v;
+                                                setRateLimits(updated);
+                                            }}
+                                            placeholder="100"
+                                            type="number"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setRateLimits(rateLimits.filter((_, i) => i !== idx))}
+                                            className="text-red-400 hover:text-red-300"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'logger' && (
+                <div className="space-y-6">
+                    <FormField label="Log Level">
+                        <SelectInput
+                            value={logLevel}
+                            onChange={setLogLevel}
+                            options={[
+                                { value: 'debug', label: 'Debug' },
+                                { value: 'info', label: 'Info' },
+                                { value: 'warn', label: 'Warning' },
+                                { value: 'error', label: 'Error' },
+                            ]}
+                        />
+                    </FormField>
+
+                    <FormField label="Log File" hint="Leave empty for stdout only">
+                        <TextInput
+                            value={logFile}
+                            onChange={setLogFile}
+                            placeholder="./logs/hector.log"
+                        />
+                    </FormField>
+
+                    <FormField label="Log Format">
+                        <SelectInput
+                            value={logFormat}
+                            onChange={setLogFormat}
+                            options={[
+                                { value: 'text', label: 'Text' },
+                                { value: 'json', label: 'JSON' },
+                            ]}
+                        />
+                    </FormField>
                 </div>
             )}
         </ResourceModal>

@@ -14,6 +14,8 @@ export interface HectorConfig {
   agents?: Record<string, AgentConfig>;
   storage?: StorageConfig;
   observability?: ObservabilityConfig;
+  logger?: LoggerConfig;
+  rate_limiting?: RateLimitingConfig;
   defaults?: { llm?: string };
 }
 
@@ -23,45 +25,86 @@ export interface StorageConfig {
   memory?: {
     backend?: string;
     embedder?: string; // Reference to embedder config
-    database?: string; // For SQL or Redis backend
-    vector_provider?: { // For vector backend
-      type?: 'chromem' | 'qdrant' | 'chroma' | 'pinecone';
-      chromem?: { persist_path?: string; compress?: boolean };
-      qdrant?: { url?: string; api_key?: string; collection?: string };
-    };
+    vector_provider?: VectorProviderConfig;
   };
   checkpoint?: {
     enabled?: boolean;
-    backend?: string;
-    database?: string;
     strategy?: 'event' | 'interval' | 'hybrid';
     interval?: number;
     after_tools?: boolean;
     before_llm?: boolean;
     recovery?: {
         auto_resume?: boolean;
+        auto_resume_hitl?: boolean;
         timeout?: number;
     };
   };
 }
 
+// Nested vector provider config (matching hector pre-v1.14.0 schema)
+export interface VectorProviderConfig {
+  type?: 'chromem' | 'qdrant' | 'chroma' | 'pinecone' | 'weaviate' | 'milvus';
+  chromem?: {
+    persist_path?: string;
+    compress?: boolean;
+  };
+  // Future: other providers
+  // qdrant?: { ... };
+}
+
 export interface ObservabilityConfig {
-  metrics?: { enabled?: boolean };
+  metrics?: {
+    enabled?: boolean;
+    endpoint?: string;
+    namespace?: string;
+    subsystem?: string;
+    const_labels?: Record<string, string>;
+  };
   tracing?: {
     enabled?: boolean;
     exporter?: string;
     endpoint?: string;
     sampling_rate?: number;
+    service_name?: string;
+    service_version?: string;
+    insecure?: boolean;
+    headers?: Record<string, string>;
+    capture_payloads?: boolean;
+    debug_exporter?: boolean;
+    timeout?: number;
   };
+}
+
+export interface LoggerConfig {
+  level?: string;
+  file?: string;
+  format?: string;
+}
+
+export interface RateLimitingConfig {
+  enabled?: boolean;
+  scope?: string;
+  backend?: string;
+  sql_database?: string;
+  limits?: Array<{
+    type: string;
+    window: string;
+    limit: number;
+  }>;
 }
 
 export interface LLMConfig {
   provider?: string;
   model?: string;
   api_key?: string;
+  base_url?: string;
   temperature?: number;
   max_tokens?: number;
-  reasoning?: { budget_tokens?: number };
+  max_tool_output_length?: number;
+  thinking?: {
+    enabled?: boolean;
+    budget_tokens?: number;
+  };
 }
 
 export interface ToolConfig {
@@ -115,33 +158,92 @@ export interface GuardrailConfig {
 
 export interface DatabaseConfig {
   driver?: string;
-  dsn?: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  password?: string;
+  ssl_mode?: string;
+  max_conns?: number;
+  max_idle?: number;
 }
 
 export interface EmbedderConfig {
   provider?: string;
   model?: string;
   api_key?: string;
-  dimensions?: number;
+  base_url?: string;
+  dimension?: number;
+  timeout?: number;
+  batch_size?: number;
+  encoding_format?: string;
+  user?: string;
+  input_type?: string;
+  output_dimension?: number;
+  truncate?: string;
 }
 
+// Top-level vector store config (flat format for v1.14.0+)
 export interface VectorStoreConfig {
-  provider?: string;
-  url?: string;
+  type: string;
+  host?: string;
+  port?: number;
   api_key?: string;
+  enable_tls?: boolean;
+  persist_path?: string;
+  compress?: boolean;
   collection?: string;
+  index_name?: string;
+  environment?: string;
 }
 
 export interface DocumentStoreConfig {
   embedder?: string;
   vector_store?: string;
+  collection?: string;
+  watch?: boolean;
+  incremental_indexing?: boolean;
   source?: {
-    directory?: { path?: string; watch?: boolean };
-    sql?: { database?: string; table?: string; query?: string };
-    api?: { url?: string; method?: string };
+    type?: string;
+    path?: string;
+    include?: string[];
+    exclude?: string[];
+    max_file_size?: number;
+    sql?: { database?: string; tables?: Array<{ table: string; columns: string[]; id_column: string }> };
+    api?: { url?: string; headers?: Record<string, string>; id_field?: string; content_field?: string };
+    collection?: string;
   };
-  chunker?: { size?: number; overlap?: number; strategy?: string };
-  search?: { top_k?: number; hyde_llm?: string; rerank_llm?: string };
+  chunking?: {
+    strategy?: string;
+    size?: number;
+    overlap?: number;
+    min_size?: number;
+    max_size?: number;
+    preserve_words?: boolean;
+  };
+  search?: {
+    top_k?: number;
+    threshold?: number;
+    enable_hyde?: boolean;
+    hyde_llm?: string;
+    enable_rerank?: boolean;
+    rerank_llm?: string;
+    rerank_max_results?: number;
+    enable_multi_query?: boolean;
+    multi_query_llm?: string;
+    multi_query_count?: number;
+  };
+  indexing?: {
+    max_concurrent?: number;
+    retry?: { max_retries?: number; base_delay?: number; max_delay?: number; jitter?: number };
+  };
+  mcp_parsers?: {
+    tool_names: string[];
+    extensions?: string[];
+    priority?: number;
+    prefer_native?: boolean;
+    path_prefix?: string;
+  };
 }
 
 export interface AgentConfig {
@@ -153,6 +255,7 @@ export interface AgentConfig {
   sub_agents?: string[];
   agent_tools?: string[];
   instruction?: string;
+  instruction_file?: string;
   global_instruction?: string;
   guardrails?: string;
   document_stores?: string[];
@@ -160,39 +263,86 @@ export interface AgentConfig {
   streaming?: boolean;
   include_context?: boolean;
   include_context_limit?: number;
+  include_context_max_length?: number;
+  prompt?: {
+    system_prompt?: string;
+    role?: string;
+    guidance?: string;
+  };
   context?: {
     strategy?: string;
     window_size?: number;
     budget?: number;
     threshold?: number;
     target?: number;
+    preserve_recent?: number;
+    summarizer_llm?: string;
   };
   reasoning?: {
     max_iterations?: number;
     enable_exit_tool?: boolean;
     enable_escalate_tool?: boolean;
+    termination_conditions?: string[];
+    completion_instruction?: string;
   };
-  structured_output?: { schema?: Record<string, any>; strict?: boolean };
-  skills?: Array<{ id?: string; name?: string; description?: string; tags?: string[] }>;
+  structured_output?: { schema?: Record<string, any>; strict?: boolean; name?: string };
+  skills?: Array<{ id?: string; name?: string; description?: string; tags?: string[]; examples?: string[] }>;
   input_modes?: string[];
   output_modes?: string[];
   // Remote agent
   url?: string;
   agent_card_url?: string;
+  agent_card_file?: string;
   headers?: Record<string, string>;
   timeout?: string;
   // Workflow
   max_iterations?: number;
   // Trigger
   trigger?: TriggerConfig;
+  // Per-agent notifications
+  notifications?: NotificationConfig[];
 }
 
 export interface TriggerConfig {
-  type?: string;
+  type: 'schedule' | 'webhook';
+  enabled?: boolean;
+  // Schedule trigger fields
   cron?: string;
   timezone?: string;
   input?: string;
+  // Webhook trigger fields
+  path?: string;
+  methods?: string[];
+  secret?: string;
+  signature_header?: string;
+  webhook_input?: WebhookInputConfig;
+  response?: WebhookResponseConfig;
+}
+
+export interface WebhookInputConfig {
+  template?: string;
+  extract_fields?: { path: string; as: string }[];
+}
+
+export interface WebhookResponseConfig {
+  mode?: 'sync' | 'async' | 'callback';
+  timeout?: number;
+  callback_field?: string;
+}
+
+export interface NotificationConfig {
+  id: string;
+  type: 'webhook';
   enabled?: boolean;
+  events: string[]; // 'task.started' | 'task.completed' | 'task.failed'
+  url: string;
+  headers?: Record<string, string>;
+  payload?: { template?: string };
+  retry?: {
+    max_attempts?: number;
+    initial_delay?: number;
+    max_delay?: number;
+  };
 }
 
 /**

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ResourceModal, FormField, TextInput, SelectInput } from './ResourceModal';
+import { ResourceModal, FormField, TextInput, SelectInput, ToggleInput } from './ResourceModal';
 import type { LLMConfig } from '../../lib/config-utils';
 
 const LLM_PROVIDERS = [
@@ -7,6 +7,10 @@ const LLM_PROVIDERS = [
     { value: 'anthropic', label: 'Anthropic' },
     { value: 'gemini', label: 'Google Gemini' },
     { value: 'ollama', label: 'Ollama' },
+    { value: 'deepseek', label: 'DeepSeek' },
+    { value: 'groq', label: 'Groq' },
+    { value: 'mistral', label: 'Mistral' },
+    { value: 'cohere', label: 'Cohere' },
 ];
 
 const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string }>> = {
@@ -34,6 +38,22 @@ const PROVIDER_MODELS: Record<string, Array<{ value: string; label: string }>> =
         { value: 'mistral', label: 'Mistral' },
         { value: 'codellama', label: 'Code Llama' },
     ],
+    deepseek: [
+        { value: 'deepseek-chat', label: 'DeepSeek Chat' },
+        { value: 'deepseek-coder', label: 'DeepSeek Coder' },
+    ],
+    groq: [
+        { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
+        { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
+    ],
+    mistral: [
+        { value: 'mistral-large-latest', label: 'Mistral Large' },
+        { value: 'mistral-medium-latest', label: 'Mistral Medium' },
+    ],
+    cohere: [
+        { value: 'command-r-plus', label: 'Command R+' },
+        { value: 'command-r', label: 'Command R' },
+    ],
 };
 
 interface LLMModalProps {
@@ -59,8 +79,12 @@ export const LLMModal: React.FC<LLMModalProps> = ({
     const [provider, setProvider] = useState('openai');
     const [model, setModel] = useState('');
     const [apiKey, setApiKey] = useState('');
+    const [baseUrl, setBaseUrl] = useState('');
     const [temperature, setTemperature] = useState('');
     const [maxTokens, setMaxTokens] = useState('');
+    const [maxToolOutputLength, setMaxToolOutputLength] = useState('');
+    const [thinkingEnabled, setThinkingEnabled] = useState(false);
+    const [thinkingBudget, setThinkingBudget] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     // Reset form when modal opens
@@ -71,15 +95,23 @@ export const LLMModal: React.FC<LLMModalProps> = ({
                 setProvider(editConfig.provider || 'openai');
                 setModel(editConfig.model || '');
                 setApiKey(editConfig.api_key || '');
+                setBaseUrl(editConfig.base_url || '');
                 setTemperature(editConfig.temperature?.toString() || '');
                 setMaxTokens(editConfig.max_tokens?.toString() || '');
+                setMaxToolOutputLength(editConfig.max_tool_output_length?.toString() || '');
+                setThinkingEnabled(editConfig.thinking?.enabled || false);
+                setThinkingBudget(editConfig.thinking?.budget_tokens?.toString() || '');
             } else {
                 setId('');
                 setProvider('openai');
                 setModel('');
                 setApiKey('');
+                setBaseUrl('');
                 setTemperature('');
                 setMaxTokens('');
+                setMaxToolOutputLength('');
+                setThinkingEnabled(false);
+                setThinkingBudget('');
             }
             setShowAdvanced(false);
         }
@@ -90,9 +122,19 @@ export const LLMModal: React.FC<LLMModalProps> = ({
             provider,
             model: model || undefined,
             api_key: apiKey || undefined,
+            base_url: baseUrl || undefined,
             temperature: temperature ? parseFloat(temperature) : undefined,
             max_tokens: maxTokens ? parseInt(maxTokens) : undefined,
+            max_tool_output_length: maxToolOutputLength ? parseInt(maxToolOutputLength) : undefined,
         };
+
+        // Add thinking config if enabled
+        if (thinkingEnabled || thinkingBudget) {
+            config.thinking = {
+                enabled: thinkingEnabled,
+                budget_tokens: thinkingBudget ? parseInt(thinkingBudget) : undefined,
+            };
+        }
 
         // Clean undefined values
         Object.keys(config).forEach(key => {
@@ -106,6 +148,7 @@ export const LLMModal: React.FC<LLMModalProps> = ({
     };
 
     const isValid = id && provider && !(!isEditing && existingIds.includes(id));
+    const supportsThinking = provider === 'anthropic'; // Only Anthropic supports extended thinking
 
     return (
         <ResourceModal
@@ -165,6 +208,14 @@ export const LLMModal: React.FC<LLMModalProps> = ({
 
             {showAdvanced && (
                 <>
+                    <FormField label="Base URL" hint="Custom API endpoint (leave empty for default)">
+                        <TextInput
+                            value={baseUrl}
+                            onChange={setBaseUrl}
+                            placeholder="e.g., http://localhost:11434"
+                        />
+                    </FormField>
+
                     <FormField label="Temperature" hint="0.0 to 2.0, controls randomness">
                         <TextInput
                             value={temperature}
@@ -182,6 +233,36 @@ export const LLMModal: React.FC<LLMModalProps> = ({
                             type="number"
                         />
                     </FormField>
+
+                    <FormField label="Max Tool Output Length" hint="Truncate tool outputs (0 = unlimited)">
+                        <TextInput
+                            value={maxToolOutputLength}
+                            onChange={setMaxToolOutputLength}
+                            placeholder="e.g., 10000"
+                            type="number"
+                        />
+                    </FormField>
+
+                    {supportsThinking && (
+                        <div className="space-y-3 p-3 bg-white/5 rounded-lg">
+                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Extended Thinking (Claude)</div>
+                            <ToggleInput
+                                checked={thinkingEnabled}
+                                onChange={setThinkingEnabled}
+                                label="Enable Extended Thinking"
+                            />
+                            {thinkingEnabled && (
+                                <FormField label="Thinking Budget" hint="Token budget for thinking">
+                                    <TextInput
+                                        value={thinkingBudget}
+                                        onChange={setThinkingBudget}
+                                        placeholder="e.g., 1024"
+                                        type="number"
+                                    />
+                                </FormField>
+                            )}
+                        </div>
+                    )}
                 </>
             )}
         </ResourceModal>
