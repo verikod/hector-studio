@@ -966,6 +966,37 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   />
                 </div>
 
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-1">Headers (one per line: Key: Value)</label>
+                  <textarea
+                    defaultValue={
+                      notif.headers
+                        ? Object.entries(notif.headers as Record<string, string>)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join('\n')
+                        : ''
+                    }
+                    onBlur={(e) => {
+                      const lines = e.target.value.split('\n');
+                      const headers: Record<string, string> = {};
+                      lines.forEach(line => {
+                        const colonIdx = line.indexOf(':');
+                        if (colonIdx > 0) {
+                          const key = line.substring(0, colonIdx).trim();
+                          const value = line.substring(colonIdx + 1).trim();
+                          if (key) headers[key] = value;
+                        }
+                      });
+                      const newNotifs = [...(localData.notifications as any[])];
+                      newNotifs[index] = { ...notif, headers: Object.keys(headers).length > 0 ? headers : undefined };
+                      handleChange('notifications', newNotifs);
+                    }}
+                    rows={2}
+                    className="w-full px-2 py-1.5 bg-black/20 border border-white/10 rounded text-xs font-mono focus:outline-none focus:border-hector-green resize-none"
+                    placeholder="Authorization: Bearer ${TOKEN}&#10;X-Custom-Header: value"
+                  />
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   {['started', 'completed', 'failed'].map(suffix => {
                     const event = `task.${suffix}`;
