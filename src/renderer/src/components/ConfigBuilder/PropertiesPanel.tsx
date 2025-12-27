@@ -836,6 +836,24 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 </select>
               </div>
 
+              {localData.trigger?.response?.mode === 'callback' && (
+                <div className="pl-2 border-l-2 border-hector-green/30 ml-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Callback URL</label>
+                  <input
+                    type="text"
+                    value={localData.trigger?.response?.callback_url || ''}
+                    onChange={(e) => handleChange('trigger', {
+                      ...localData.trigger,
+                      response: { ...localData.trigger?.response, callback_url: e.target.value }
+                    })}
+                    disabled={readonly}
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-sm focus:outline-none focus:border-hector-green disabled:opacity-50"
+                    placeholder="https://api.example.com/webhook"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Fallback URL if not provided in payload</p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">HMAC Secret</label>
                 <input
