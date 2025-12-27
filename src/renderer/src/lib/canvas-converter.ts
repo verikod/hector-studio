@@ -227,6 +227,7 @@ export const yamlToGraph = (yamlContent: string): GraphData => {
             isRemote,
             url: agentConfig.url,
             trigger: agentConfig.trigger,
+            notifications: agentConfig.notifications,
             config: agentConfig,
           },
           style: {
@@ -263,6 +264,39 @@ export const yamlToGraph = (yamlContent: string): GraphData => {
 };
 
 /**
+ * Cleans trigger config by removing irrelevant fields based on type.
+ * Also removes empty string values.
+ */
+const cleanTrigger = (trigger: any): any | undefined => {
+  if (!trigger || !trigger.type) return undefined;
+
+  const cleaned: any = { type: trigger.type };
+
+  // Common fields
+  if (trigger.enabled !== undefined) cleaned.enabled = trigger.enabled;
+  if (trigger.input && trigger.input.trim()) cleaned.input = trigger.input;
+
+  if (trigger.type === 'schedule') {
+    // Schedule-specific fields
+    if (trigger.cron && trigger.cron.trim()) cleaned.cron = trigger.cron;
+    if (trigger.timezone && trigger.timezone.trim()) cleaned.timezone = trigger.timezone;
+  } else if (trigger.type === 'webhook') {
+    // Webhook-specific fields
+    if (trigger.path && trigger.path.trim()) cleaned.path = trigger.path;
+    if (trigger.response) {
+      const resp: any = {};
+      if (trigger.response.mode && trigger.response.mode.trim()) resp.mode = trigger.response.mode;
+      if (trigger.response.callback_url && trigger.response.callback_url.trim()) {
+        resp.callback_url = trigger.response.callback_url;
+      }
+      if (Object.keys(resp).length > 0) cleaned.response = resp;
+    }
+  }
+
+  return Object.keys(cleaned).length > 1 ? cleaned : undefined; // Must have at least type + one other field
+};
+
+/**
  * Converts React Flow graph back to YAML config
  * Note: This only updates the agents section, preserving other config
  */
@@ -293,7 +327,9 @@ export const graphToYaml = (nodes: Node[], existingYaml: string): string => {
         guardrails: nodeData.guardrails || existingAgent.guardrails,
         document_stores: nodeData.documentStores || existingAgent.document_stores,
         url: nodeData.url || existingAgent.url,
-        trigger: nodeData.trigger?.type ? nodeData.trigger : undefined,
+        trigger: cleanTrigger(nodeData.trigger) || cleanTrigger(existingAgent.trigger),
+        notifications: (nodeData.notifications?.length > 0 ? nodeData.notifications : undefined) 
+          || (existingAgent.notifications?.length > 0 ? existingAgent.notifications : undefined),
       };
       
       // Clean undefined values
